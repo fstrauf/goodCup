@@ -1,0 +1,13 @@
+{
+	"dependencies": {
+		"expo-camera": "^16.0.18",
+		"expo-image-manipulator": "^13.0.6",
+		"expo-image-picker": "^16.0.6",
+		"expo-media-library": "^17.0.6",
+		"react-native-dotenv": "^3.4.11",
+		"react-native-vision-camera": "^4.6.4"
+	},
+	"devDependencies": {
+		"babel-plugin-module-resolver": "^5.0.2"
+	}
+}
