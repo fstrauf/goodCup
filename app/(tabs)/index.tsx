@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, Text, Platform, Alert, View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -6,19 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dropdown } from 'react-native-element-dropdown';
 import { Input, Slider, Switch, Card, Divider, Button as RNEButton } from '@rneui/themed';
 import { getBrewSuggestions } from '../../lib/openai';
+import { useLocalSearchParams } from 'expo-router';
 
 const BREWS_STORAGE_KEY = '@GoodCup:brews';
-const BEAN_NAMES_STORAGE_KEY = '@GoodCup:beanNames';
 const BREW_DEVICES_KEY = '@GoodCup:brewDevices';
 const GRINDERS_KEY = '@GoodCup:grinders';
-const BEANS_STORAGE_KEY = '@GoodCup:beans';
 const DEFAULT_BREW_DEVICE_KEY = '@GoodCup:defaultBrewDevice';
 const DEFAULT_GRINDER_KEY = '@GoodCup:defaultGrinder';
-
-interface BeanNameOption {
-  label: string;
-  value: string;
-}
 
 interface DropdownItem {
   label: string;
@@ -69,6 +63,7 @@ const formatTime = (totalSeconds: number): string => {
 };
 
 const HomeScreenComponent = () => {
+  const params = useLocalSearchParams<{ beanName?: string }>();
   const [beanName, setBeanName] = useState<string | null>(null);
   const [steepTimeSeconds, setSteepTimeSeconds] = useState(180);
   const [useBloom, setUseBloom] = useState(false);
@@ -88,61 +83,21 @@ const HomeScreenComponent = () => {
   const [suggestion, setSuggestion] = useState<string>('');
   const [showSuggestion, setShowSuggestion] = useState(false);
 
-  const [allBeanNames, setAllBeanNames] = useState<string[]>([]);
-  const [beanNameOptions, setBeanNameOptions] = useState<BeanNameOption[]>([]);
+  useEffect(() => {
+    if (params.beanName) {
+      setBeanName(params.beanName);
+      console.log("[Effect] Bean name set from route params:", params.beanName);
+    } else {
+      console.warn("[Effect] No beanName found in route params.");
+      // Optionally navigate back or show an error if beanName is essential
+      // Alert.alert('Error', 'No bean selected.');
+      // router.back();
+    }
+  }, [params.beanName]);
 
   useEffect(() => {
-    loadBeanNames();
     loadEquipment();
   }, []);
-
-  useEffect(() => {
-    const options = allBeanNames.map(name => ({ label: name, value: name }));
-    console.log("[Effect] Derived beanNameOptions:", options);
-    setBeanNameOptions(options);
-  }, [allBeanNames]);
-
-  useEffect(() => {
-    console.log("[Debug] Current beanName state:", beanName);
-  }, [beanName]);
-
-  const loadBeanNames = async () => {
-    try {
-      // First, try to load from the new Beans storage
-      const storedBeans = await AsyncStorage.getItem(BEANS_STORAGE_KEY);
-      if (storedBeans) {
-        const beans = JSON.parse(storedBeans) as StoredBean[];
-        const beanNames = beans.map((bean: StoredBean) => bean.name);
-        if (beanNames.length > 0) {
-          setAllBeanNames(beanNames);
-          
-          // Create options for dropdown
-          const options = beanNames.map((name: string) => ({
-            label: name,
-            value: name
-          }));
-          setBeanNameOptions(options);
-          return;
-        }
-      }
-      
-      // If no beans in new storage, fall back to the old storage method
-      const storedNames = await AsyncStorage.getItem(BEAN_NAMES_STORAGE_KEY);
-      if (storedNames) {
-        const parsedNames = JSON.parse(storedNames) as string[];
-        setAllBeanNames(parsedNames);
-        
-        // Create options for dropdown
-        const options = parsedNames.map((name: string) => ({
-          label: name,
-          value: name
-        }));
-        setBeanNameOptions(options);
-      }
-    } catch (error) {
-      console.error('Error loading bean names:', error);
-    }
-  };
 
   const loadEquipment = async () => {
     try {
@@ -151,58 +106,48 @@ const HomeScreenComponent = () => {
       const defaultDeviceId = await AsyncStorage.getItem(DEFAULT_BREW_DEVICE_KEY);
       const defaultGrinderId = await AsyncStorage.getItem(DEFAULT_GRINDER_KEY);
       
+      let devices: BrewDevice[] = [];
+      let grinders: Grinder[] = [];
+
       if (storedDevices) {
-        setBrewDevices(JSON.parse(storedDevices));
+        devices = JSON.parse(storedDevices);
+        setBrewDevices(devices);
       }
       
       if (storedGrinders) {
-        setGrinders(JSON.parse(storedGrinders));
+        grinders = JSON.parse(storedGrinders);
+        setGrinders(grinders);
       }
 
-      // Set default selections if available
-      if (defaultDeviceId) {
+      // Set default selections if available AND if the default device/grinder still exists
+      if (defaultDeviceId && devices.some(d => d.id === defaultDeviceId)) {
+        console.log("[LoadEquipment] Setting default brew device:", defaultDeviceId);
         setSelectedBrewDevice(defaultDeviceId);
+      } else if (defaultDeviceId) {
+         console.warn("[LoadEquipment] Saved default brew device not found in current list:", defaultDeviceId);
+         // Optionally remove the invalid default from storage
+         // await AsyncStorage.removeItem(DEFAULT_BREW_DEVICE_KEY);
       }
       
-      if (defaultGrinderId) {
+      if (defaultGrinderId && grinders.some(g => g.id === defaultGrinderId)) {
+        console.log("[LoadEquipment] Setting default grinder:", defaultGrinderId);
         setSelectedGrinder(defaultGrinderId);
+      } else if (defaultGrinderId) {
+         console.warn("[LoadEquipment] Saved default grinder not found in current list:", defaultGrinderId);
+         // Optionally remove the invalid default from storage
+         // await AsyncStorage.removeItem(DEFAULT_GRINDER_KEY);
       }
     } catch (error) {
       console.error('Error loading equipment:', error);
     }
   };
 
-  const saveBeanName = async (nameToSave: string | null) => {
-    console.log("[saveBeanName] Attempting to save:", nameToSave);
-    if (!nameToSave || allBeanNames.includes(nameToSave)) {
-      console.log("[saveBeanName] Skipping save (null, empty, or duplicate).");
-      return;
-    }
-    try {
-      const updatedNames = [...allBeanNames, nameToSave].sort();
-      console.log("[saveBeanName] Saving updated names:", updatedNames);
-      setAllBeanNames(updatedNames);
-      
-      // Create the option immediately and add it to options
-      const newOption = { label: nameToSave, value: nameToSave };
-      const updatedOptions = [...beanNameOptions, newOption].sort((a, b) => a.label.localeCompare(b.label));
-      setBeanNameOptions(updatedOptions);
-      
-      await AsyncStorage.setItem(BEAN_NAMES_STORAGE_KEY, JSON.stringify(updatedNames));
-      console.log("[saveBeanName] Successfully saved to AsyncStorage");
-    } catch (e) {
-      console.error("[saveBeanName] Failed to save bean name.", e);
-    }
-  };
-
   const handleSaveBrew = async () => {
     console.log("[handleSaveBrew] Current beanName state before save:", beanName);
     if (!beanName || !grindSize || !waterTemp) {
-      Alert.alert('Missing Info', 'Please fill in Bean Name, Grind Size, and Water Temp.');
+      Alert.alert('Missing Info', 'Please fill in Grind Size, and Water Temp (Bean should be pre-selected).');
       return;
     }
-    
-    await saveBeanName(beanName);
     
     const newBrew: Brew = {
       id: Date.now().toString(),
@@ -226,7 +171,6 @@ const HomeScreenComponent = () => {
       const updatedBrews = [...existingBrews, newBrew];
       await AsyncStorage.setItem(BREWS_STORAGE_KEY, JSON.stringify(updatedBrews));
 
-      setBeanName(null);
       setSteepTimeSeconds(180);
       setUseBloom(false);
       setBloomTime('');
@@ -234,7 +178,7 @@ const HomeScreenComponent = () => {
       setWaterTemp('');
       setRating(5);
       setNotes('');
-      Alert.alert('Success', 'Brew saved successfully!');
+      Alert.alert('Success', `Brew saved for ${beanName}!`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.error('[handleSaveBrew] Failed to save brew.', e);
@@ -295,58 +239,6 @@ const HomeScreenComponent = () => {
     };
   }, [timerInterval]);
 
-  // Get AI suggestions for the current brew
-  const getAiSuggestions = async () => {
-    if (!beanName || !grindSize || !waterTemp) {
-      Alert.alert('Missing Info', 'Please fill in Bean Name, Grind Size, and Water Temp.');
-      return;
-    }
-
-    setGettingSuggestion(true);
-    setSuggestion('');
-    setShowSuggestion(true);
-    
-    try {
-      // Create current brew object
-      const currentBrew: Brew = {
-        id: 'temp',
-        timestamp: Date.now(),
-        beanName: beanName,
-        steepTime: steepTimeSeconds,
-        useBloom,
-        bloomTime: useBloom ? bloomTime : undefined,
-        grindSize,
-        waterTemp,
-        rating,
-        notes,
-        brewDevice: selectedBrewDevice || undefined,
-        grinder: selectedGrinder || undefined
-      };
-      
-      // Get existing brews
-      const storedBrews = await AsyncStorage.getItem(BREWS_STORAGE_KEY);
-      let brews: Brew[] = [];
-      
-      if (storedBrews) {
-        brews = JSON.parse(storedBrews);
-      }
-      
-      // Get previous brews with same bean
-      const relatedBrews = brews.filter(brew => 
-        brew.beanName.toLowerCase() === beanName.toLowerCase()
-      );
-      
-      // Get suggestions
-      const result = await getBrewSuggestions(currentBrew, relatedBrews, beanName);
-      setSuggestion(result);
-    } catch (error) {
-      console.error('Error getting suggestions:', error);
-      setSuggestion('Error getting suggestions. Please check your OpenAI API key in settings.');
-    }
-    
-    setGettingSuggestion(false);
-  };
-
   // Format brew devices and grinders for dropdown
   const brewDeviceOptions: DropdownItem[] = brewDevices.map(device => ({
     label: device.name,
@@ -358,73 +250,51 @@ const HomeScreenComponent = () => {
     value: grinder.id
   }));
 
-  console.log("[Render] Data passed to Dropdown:", beanNameOptions);
-
-  // Function to get bean details to display additional info on selection
-  const getBeanDetails = useCallback(async (beanName: string) => {
-    if (!beanName) return null;
-    
-    try {
-      const storedBeans = await AsyncStorage.getItem(BEANS_STORAGE_KEY);
-      if (storedBeans) {
-        const beans = JSON.parse(storedBeans) as StoredBean[];
-        const matchedBean = beans.find(bean => bean.name === beanName);
-        
-        if (matchedBean) {
-          // If we find bean details, show them to the user
-          Alert.alert(
-            `${matchedBean.name}`,
-            `Roaster: ${matchedBean.roaster}\nOrigin: ${matchedBean.origin}\nProcess: ${matchedBean.process}\nRoast: ${matchedBean.roastLevel}${matchedBean.flavorNotes?.length ? `\n\nFlavor Notes: ${matchedBean.flavorNotes.join(', ')}` : ''}${matchedBean.description ? `\n\n${matchedBean.description}` : ''}`,
-            [{ text: 'OK' }]
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Error getting bean details:', error);
-    }
-  }, []);
-
-  // Update the handleBeanChange function
-  const handleBeanChange = (value: string) => {
-    setBeanName(value);
-    
-    // Show bean details if available
-    if (value) {
-      getBeanDetails(value);
-    }
-  };
+  if (!beanName) {
+    return (
+      <SafeAreaView className="flex-1 bg-soft-off-white justify-center items-center">
+        <ActivityIndicator size="large" color="#A8B9AE" />
+        <Text className="text-cool-gray-green mt-2">Loading bean...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={['top', 'left', 'right']}>
-      <View className="flex-1 bg-white dark:bg-black px-3">
+    <SafeAreaView className="flex-1 bg-soft-off-white" edges={['top', 'left', 'right']}>
+      <View className="flex-1 bg-soft-off-white px-3">
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
+ 
+
           <Card 
             containerStyle={{
-              borderRadius: 10,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 12,
+              borderWidth: 1, 
+              borderColor: '#E7E7E7',
               paddingHorizontal: 0,
               paddingVertical: 0,
-              elevation: 1,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.05,
-              shadowRadius: 2,
-              marginBottom: 40,
+              marginBottom: 24,
               marginHorizontal: 0,
+              shadowColor: '#A8B9AE',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 2,
             }}
             wrapperStyle={{ padding: 0 }}
           >            
-
-            <Divider style={{ marginBottom: 16, backgroundColor: '#e1e1e1', height: 1 }} />
             
             <View className="px-4 pb-2">
+              <Text className="text-lg font-semibold text-charcoal mb-3">Brew Parameters</Text>
+              
               <View className="mb-4">
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-base font-medium text-gray-800">Steep Time</Text>
-                  <Text className="text-base font-semibold text-blue-600">
+                  <Text className="text-base font-medium text-charcoal">Steep Time</Text>
+                  <Text className="text-base font-semibold text-cool-gray-green">
                     {formatTime(timerActive ? timerSeconds : steepTimeSeconds)}
                   </Text>
                 </View>
@@ -432,71 +302,93 @@ const HomeScreenComponent = () => {
                   value={steepTimeSeconds}
                   onValueChange={(value) => onSliderChange(value, 'time')}
                   minimumValue={30}
-                  maximumValue={240}
+                  maximumValue={300}
                   step={5}
                   allowTouchTrack={true}
-                  minimumTrackTintColor="#2089dc"
-                  maximumTrackTintColor="#d3d3d3"
-                  thumbTintColor="#2089dc"
+                  minimumTrackTintColor="#A8B9AE"
+                  maximumTrackTintColor="#E7E7E7"
+                  thumbTintColor="#A8B9AE"
                   trackStyle={{ height: 6, borderRadius: 3 }}
-                  thumbStyle={{ height: 20, width: 20, backgroundColor: 'white', borderWidth: 2, borderColor: '#2089dc' }}
+                  thumbStyle={{ height: 20, width: 20, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#A8B9AE' }}
                 />
               </View>
 
               <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-base font-medium text-gray-800">Use Bloom?</Text>
+                <Text className="text-base font-medium text-charcoal">Use Bloom?</Text>
                 <Switch
                   value={useBloom}
                   onValueChange={setUseBloom}
-                  color="#2089dc"
+                  color="#A8B9AE"
                 />
               </View>
 
               {useBloom && (
                 <View className="mb-4">
-                  <Text className="text-base font-medium text-gray-800 mb-2">Bloom Time (e.g., 0:30)</Text>
+                  <Text className="text-base font-medium text-charcoal mb-2">Bloom Time (e.g., 0:30)</Text>
                   <Input
                     value={bloomTime}
                     onChangeText={setBloomTime}
                     placeholder="Minutes:Seconds"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor="#A8B9AE"
                     keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
-                    inputContainerStyle={{ borderWidth: 1, borderColor: '#e1e1e1', borderRadius: 8, paddingHorizontal: 10 }}
+                    inputContainerStyle={{
+                      borderWidth: 1,
+                      borderColor: '#DADADA',
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      backgroundColor: '#FAFAF9',
+                    }}
+                    inputStyle={{ color: '#4A4A4A' }}
                   />
                 </View>
               )}
 
               <View className="mb-4">
-                <Text className="text-base font-medium text-gray-800 mb-2">Grind Size</Text>
+                <Text className="text-base font-medium text-charcoal mb-2">Grind Size</Text>
                 <Input
                   value={grindSize}
                   onChangeText={setGrindSize}
                   placeholder="Medium-Fine, 18 clicks, etc."
-                  placeholderTextColor="#9CA3AF"
-                  inputContainerStyle={{ borderWidth: 1, borderColor: '#e1e1e1', borderRadius: 8, paddingHorizontal: 10 }}
+                  placeholderTextColor="#A8B9AE"
+                  inputContainerStyle={{
+                     borderWidth: 1, 
+                     borderColor: '#DADADA', 
+                     borderRadius: 8, 
+                     paddingHorizontal: 10,
+                     backgroundColor: '#FAFAF9'
+                  }}
+                  inputStyle={{ color: '#4A4A4A' }}
                 />
               </View>
 
               <View className="mb-4">
-                <Text className="text-base font-medium text-gray-800 mb-2">Water Temperature</Text>
+                <Text className="text-base font-medium text-charcoal mb-2">Water Temperature</Text>
                 <Input
                   value={waterTemp}
                   onChangeText={setWaterTemp}
-                  placeholder="Temperature in °C or °F"
-                  placeholderTextColor="#9CA3AF"
+                  placeholder="96°C or 205°F"
+                  placeholderTextColor="#A8B9AE"
                   keyboardType="numeric"
-                  inputContainerStyle={{ borderWidth: 1, borderColor: '#e1e1e1', borderRadius: 8, paddingHorizontal: 10 }}
+                  inputContainerStyle={{
+                    borderWidth: 1, 
+                    borderColor: '#DADADA', 
+                    borderRadius: 8, 
+                    paddingHorizontal: 10,
+                    backgroundColor: '#FAFAF9'
+                  }}
+                   inputStyle={{ color: '#4A4A4A' }}
                 />
               </View>
             </View>
 
-            <Divider style={{ marginVertical: 16, backgroundColor: '#e1e1e1', height: 1 }} />
+            <Divider style={{ marginVertical: 16, backgroundColor: '#E7E7E7', height: 1 }} />
             
             <View className="px-4 pb-2">
+              <Text className="text-lg font-semibold text-charcoal mb-3">Rating & Notes</Text>
               <View className="mb-4">
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-base font-medium text-gray-800">Rating</Text>
-                  <Text className="text-base font-semibold text-blue-600">{rating}/10</Text>
+                  <Text className="text-base font-medium text-charcoal">Rating</Text>
+                  <Text className="text-base font-semibold text-cool-gray-green">{rating}/10</Text>
                 </View>
                 <Slider
                   value={rating}
@@ -505,34 +397,36 @@ const HomeScreenComponent = () => {
                   maximumValue={10}
                   step={1}
                   allowTouchTrack={true}
-                  minimumTrackTintColor="#2089dc"
-                  maximumTrackTintColor="#d3d3d3"
-                  thumbTintColor="#2089dc"
+                  minimumTrackTintColor="#A8B9AE"
+                  maximumTrackTintColor="#E7E7E7"
+                  thumbTintColor="#A8B9AE"
                   trackStyle={{ height: 6, borderRadius: 3 }}
-                  thumbStyle={{ height: 20, width: 20, backgroundColor: 'white', borderWidth: 2, borderColor: '#2089dc' }}
+                  thumbStyle={{ height: 20, width: 20, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#A8B9AE' }}
                 />
               </View>
 
               <View className="mb-4">
-                <Text className="text-base font-medium text-gray-800 mb-2">Notes</Text>
+                <Text className="text-base font-medium text-charcoal mb-2">Notes</Text>
                 <Input
                   value={notes}
                   onChangeText={setNotes}
                   placeholder="Tasting notes, observations, etc."
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor="#A8B9AE"
                   multiline
                   numberOfLines={4}
-                  inputContainerStyle={{ 
-                    borderWidth: 1, 
-                    borderColor: '#e1e1e1', 
-                    borderRadius: 8, 
+                  inputContainerStyle={{
+                    borderWidth: 1,
+                    borderColor: '#DADADA',
+                    borderRadius: 8,
                     paddingHorizontal: 10,
-                    minHeight: 100
+                    paddingVertical: 8,
+                    minHeight: 100,
+                    backgroundColor: '#FAFAF9'
                   }}
-                  inputStyle={{ 
+                  inputStyle={{
+                    color: '#4A4A4A',
                     textAlignVertical: 'top',
-                    paddingTop: Platform.OS === 'ios' ? 10 : 10,
-                    paddingBottom: 10,
+                    paddingTop: Platform.OS === 'ios' ? 0 : 0,
                     minHeight: 80,
                   }}
                 />
@@ -540,124 +434,80 @@ const HomeScreenComponent = () => {
             </View>
             
             <View className="px-4 pb-2">
+              <Text className="text-lg font-semibold text-charcoal mb-3">Equipment</Text>
               <View className="mb-4">
-                <Text className="text-base font-medium text-gray-800 mb-2">Brew Device</Text>
+                <Text className="text-base font-medium text-charcoal mb-2">Brew Device</Text>
                 <Dropdown
                   style={{
                     height: 50,
-                    borderColor: '#e1e1e1',
+                    borderColor: '#DADADA',
                     borderWidth: 1,
                     borderRadius: 8,
                     paddingHorizontal: 10,
+                    backgroundColor: '#FAFAF9'
                   }}
-                  placeholderStyle={{ color: '#9e9e9e' }}
-                  selectedTextStyle={{ color: '#333' }}
+                  placeholderStyle={{ color: '#A8B9AE' }}
+                  selectedTextStyle={{ color: '#4A4A4A' }}
+                  containerStyle={{ borderRadius: 8, borderColor: '#DADADA' }}
+                  itemTextStyle={{ color: '#4A4A4A' }}
+                  activeColor="#F2EFEA"
                   data={brewDeviceOptions}
                   maxHeight={300}
                   labelField="label"
                   valueField="value"
-                  placeholder="Select brew device"
+                  placeholder={brewDeviceOptions.length === 0 ? "Add in Settings" : "Select brew device"}
                   value={selectedBrewDevice}
                   onChange={(item: DropdownItem) => setSelectedBrewDevice(item.value)}
                   disable={brewDeviceOptions.length === 0}
                 />
                 {brewDeviceOptions.length === 0 && (
-                  <Text className="text-xs text-gray-500 ml-2 mt-1">Add brew devices in Settings</Text>
+                  <Text className="text-xs text-cool-gray-green ml-2 mt-1">Add brew devices in Settings</Text>
                 )}
               </View>
 
               <View className="mb-4">
-                <Text className="text-base font-medium text-gray-800 mb-2">Grinder</Text>
+                <Text className="text-base font-medium text-charcoal mb-2">Grinder</Text>
                 <Dropdown
                    style={{
                     height: 50,
-                    borderColor: '#e1e1e1',
+                    borderColor: '#DADADA',
                     borderWidth: 1,
                     borderRadius: 8,
                     paddingHorizontal: 10,
+                    backgroundColor: '#FAFAF9'
                   }}
-                  placeholderStyle={{ color: '#9e9e9e' }}
-                  selectedTextStyle={{ color: '#333' }}
+                  placeholderStyle={{ color: '#A8B9AE' }}
+                  selectedTextStyle={{ color: '#4A4A4A' }}
+                  containerStyle={{ borderRadius: 8, borderColor: '#DADADA' }}
+                  itemTextStyle={{ color: '#4A4A4A' }}
+                  activeColor="#F2EFEA"
                   data={grinderOptions}
                   maxHeight={300}
                   labelField="label"
                   valueField="value"
-                  placeholder="Select grinder"
+                  placeholder={grinderOptions.length === 0 ? "Add in Settings" : "Select grinder"}
                   value={selectedGrinder}
                   onChange={(item: DropdownItem) => setSelectedGrinder(item.value)}
                   disable={grinderOptions.length === 0}
                 />
                 {grinderOptions.length === 0 && (
-                  <Text className="text-xs text-gray-500 ml-2 mt-1">Add grinders in Settings</Text>
+                  <Text className="text-xs text-cool-gray-green ml-2 mt-1">Add grinders in Settings</Text>
                 )}
               </View>
             </View>
 
-            <View className="px-4 pb-2">
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-base font-medium text-gray-800">Timer</Text>
-                <Text className="text-base font-semibold text-blue-600">
-                  {formatTime(timerActive ? timerSeconds : steepTimeSeconds)}
-                </Text>
-              </View>
-              <View className="flex-row justify-around items-center mt-2">
-                <RNEButton
-                  title={timerActive ? "Stop" : "Start"}
-                  onPress={timerActive ? stopTimer : startTimer}
-                  buttonStyle={{ borderRadius: 8, paddingHorizontal: 16 }}
-                  containerStyle={{ flex: 1, marginRight: 4 }}
-                />
-                <RNEButton
-                  title="Reset"
-                  onPress={resetTimer}
-                  buttonStyle={{ borderRadius: 8, paddingHorizontal: 16 }}
-                  containerStyle={{ flex: 1, marginLeft: 4 }}
-                  color="#607d8b"
-                />
-              </View>
-            </View>
-
-            <Divider style={{ marginVertical: 16, backgroundColor: '#e1e1e1', height: 1 }} />
-            
-            <View className="px-4 pb-2">
-              <RNEButton
-                title="Get AI Suggestions"
-                onPress={getAiSuggestions}
-                buttonStyle={{ height: 48, borderRadius: 8, backgroundColor: '#5e35b1' }}
-                loading={gettingSuggestion}
-                icon={{ name: 'lightbulb-outline', type: 'material', color: 'white', size: 18 }}
-              />
-            </View>
-
-            {showSuggestion && (
-              <View className="px-4 pb-2">
-                <Card containerStyle={{ borderRadius: 8, padding: 16, backgroundColor: '#f9f4ff', marginTop: 8, marginHorizontal: 0 }}>
-                  <Text className="text-lg font-semibold mb-3 text-purple-700">AI Suggestions</Text>
-                  {gettingSuggestion ? (
-                    <ActivityIndicator size="large" color="#5e35b1" style={{ marginVertical: 20 }} />
-                  ) : (
-                    <Text className="text-sm leading-5 text-gray-800">
-                      {suggestion || 'No suggestions available. Please check your OpenAI API key in settings.'}
-                    </Text>
-                  )}
-                  <RNEButton
-                    title="Hide Suggestions"
-                    onPress={() => setShowSuggestion(false)}
-                    buttonStyle={{ marginTop: 12 }}
-                    type="clear"
-                    titleStyle={{ color: '#5e35b1' }}
-                  />
-                </Card>
-              </View>
-            )}
+            <Divider style={{ marginVertical: 16, backgroundColor: '#E7E7E7', height: 1 }} />        
 
             <View className="px-4 pt-4 pb-4">
               <RNEButton
                 title="Save Brew"
                 onPress={handleSaveBrew}
-                buttonStyle={{ backgroundColor: '#2089dc', borderRadius: 8, height: 50 }}
+                buttonStyle={{ backgroundColor: '#D4E2D4', borderRadius: 8, height: 50 }}
+                titleStyle={{ color: '#4A4A4A', fontWeight: 'bold' }}
                 raised
                 disabled={!beanName}
+                disabledStyle={{ backgroundColor: '#E7E7E7' }}
+                disabledTitleStyle={{ color: '#A8B9AE' }}
               />
             </View>
 

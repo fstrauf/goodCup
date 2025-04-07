@@ -7,8 +7,14 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { ThemeProvider as RNEThemeProvider } from '@rneui/themed';
+import { LogBox, View } from 'react-native'; // Import LogBox and View
 
 import { useColorScheme } from '../hooks/useColorScheme';
+
+// Ignore the specific defaultProps warning from Slider
+LogBox.ignoreLogs([
+  'Slider: Support for defaultProps will be removed',
+]);
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -29,18 +35,17 @@ export default function RootLayout() {
     return null;
   }
 
-  // TODO: Create a proper RNE theme object later if needed
-  // const rneTheme = createTheme({...}); 
-
   return (
     // Wrap with RNE ThemeProvider (can be inside or outside NavThemeProvider)
     <RNEThemeProvider /* theme={rneTheme} */>
       <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
+        <View className="flex-1 bg-soft-off-white"> 
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </View>
       </NavThemeProvider>
     </RNEThemeProvider>
   );

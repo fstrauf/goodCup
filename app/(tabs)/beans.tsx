@@ -409,21 +409,44 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
   };
   
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-soft-off-white" edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
-        <View className="flex-1 bg-white dark:bg-black">
-          <Card containerStyle={{ marginHorizontal: 12, marginTop: 12, marginBottom: 8, borderRadius: 10, padding: 16, backgroundColor: 'white' }}>
+        <View className="flex-1 bg-soft-off-white">
+          <Card containerStyle={{
+            marginHorizontal: 12,
+            marginTop: 12,
+            marginBottom: 8,
+            borderRadius: 12,
+            padding: 16,
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1,
+            borderColor: '#E7E7E7',
+            shadowColor: '#A8B9AE',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            elevation: 1
+          }}>
             <View className="flex-row items-center justify-between">
-              <Text className="text-2xl font-semibold text-gray-800">Coffee Beans</Text>
+              <Text className="text-2xl font-semibold text-charcoal">Coffee Beans</Text>
               <Button
-                icon={{ name: 'add', color: 'white', size: 22 }}
+                icon={{ name: 'add', color: showAddForm ? '#4A4A4A' : '#FFFFFF', size: 22 }}
                 title={showAddForm ? "Cancel" : "Add Bean"}
                 onPress={() => setShowAddForm(!showAddForm)}
-                buttonStyle={{ borderRadius: 8, paddingHorizontal: 12, backgroundColor: showAddForm ? '#f44336' : '#2196f3' }}
+                buttonStyle={{
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  backgroundColor: showAddForm ? '#E7E7E7' : '#A8B9AE'
+                }}
+                titleStyle={{
+                  color: showAddForm ? '#4A4A4A' : '#FFFFFF',
+                  marginLeft: 5
+                }}
               />
             </View>
           </Card>
@@ -436,61 +459,67 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
                 showsVerticalScrollIndicator={true}
                 keyboardShouldPersistTaps="handled"
               >
-                <View className="bg-white p-4 rounded-lg mb-4">
-                  <Text className="text-xl font-semibold mb-4 text-center text-gray-800">Add New Bean</Text>
+                <View className="bg-soft-off-white p-4 rounded-lg mb-4">
+                  <Text className="text-xl font-semibold mb-4 text-center text-charcoal">Add New Bean</Text>
                   
                   <View className="relative items-center mb-4">
                     {newBean.photo ? (
-                      <Image source={{ uri: newBean.photo }} className="w-full h-48 rounded-lg mb-2" />
+                      <Image source={{ uri: newBean.photo }} className="w-full h-48 rounded-lg mb-2 border border-pebble-gray" />
                     ) : (
-                      <View className="w-full h-48 rounded-lg bg-gray-200 justify-center items-center mb-2">
-                        <Icon name="image" type="material" size={40} color="#bdbdbd" />
-                        <Text className="text-gray-500 mt-2">No Photo</Text>
+                      <View className="w-full h-48 rounded-lg bg-light-beige justify-center items-center mb-2 border border-dashed border-pebble-gray">
+                        <Icon name="image-outline" type="material-community" size={40} color="#A8B9AE" />
+                        <Text className="text-cool-gray-green mt-2">No Photo</Text>
                       </View>
                     )}
                     
-                    <View className="flex-row justify-center mt-2">
+                    <View className="flex-row justify-center mt-2 space-x-3">
                       <Button
                         title="Camera"
-                        icon={{ name: 'camera-alt', type: 'material', color: 'white', size: 16 }}
+                        icon={{ name: 'camera-alt', type: 'material', color: '#4A4A4A', size: 16 }}
                         onPress={takePhoto}
-                        buttonStyle={{ marginHorizontal: 8, borderRadius: 8, paddingHorizontal: 16, backgroundColor: '#607d8b' }}
-                        titleStyle={{ fontSize: 14 }}
+                        buttonStyle={{ borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#E7E7E7' }}
+                        titleStyle={{ fontSize: 14, color: '#4A4A4A', marginLeft: 5 }}
                       />
                       <Button
                         title="Gallery"
-                        icon={{ name: 'photo-library', type: 'material', color: 'white', size: 16 }}
+                        icon={{ name: 'photo-library', type: 'material', color: '#4A4A4A', size: 16 }}
                         onPress={pickImage}
-                        buttonStyle={{ marginHorizontal: 8, borderRadius: 8, paddingHorizontal: 16, backgroundColor: '#607d8b' }}
-                        titleStyle={{ fontSize: 14 }}
+                        buttonStyle={{ borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#E7E7E7' }}
+                        titleStyle={{ fontSize: 14, color: '#4A4A4A', marginLeft: 5 }}
                       />
                     </View>
                     
                     {analyzing && (
-                      <View className="absolute top-0 left-0 right-0 bottom-0 bg-black/70 rounded-lg justify-center items-center">
-                        <ActivityIndicator size="large" color="#2196f3" />
-                        <Text className="mt-3 text-white font-medium">Analyzing photo...</Text>
+                      <View className="absolute top-0 left-0 right-0 bottom-0 bg-charcoal/70 rounded-lg justify-center items-center">
+                        <ActivityIndicator size="large" color="#A8B9AE" />
+                        <Text className="mt-3 text-soft-off-white font-medium">Analyzing photo...</Text>
                       </View>
                     )}
                   </View>
                   
-                  <Divider style={{ marginVertical: 16 }} />
+                  <Divider style={{ marginVertical: 16, backgroundColor: '#E7E7E7' }} />
                   
                   <Input
                     label="Bean Name"
                     value={newBean.name}
                     onChangeText={(text: string) => setNewBean({ ...newBean, name: text })}
                     placeholder="e.g., Ethiopia Yirgacheffe"
-                    containerStyle={{ marginBottom: 8 }}
-                    labelStyle={styles.inputLabel}
+                    containerStyle={{ marginBottom: 8, paddingHorizontal: 0 }}
+                    inputContainerStyle={styles.inputContainerStyle}
+                    inputStyle={styles.inputStyle}
+                    labelStyle={styles.inputLabelThemed}
+                    placeholderTextColor="#A8B9AE"
                   />
                   
-                  <Text style={styles.inputLabel}>Roast Level</Text>
+                  <Text style={styles.inputLabelThemed}>Roast Level</Text>
                   <Dropdown
-                    style={styles.dropdown}
-                    placeholderStyle={styles.placeholderStyle}
-                    selectedTextStyle={styles.selectedTextStyle}
-                    inputSearchStyle={styles.inputSearchStyle}
+                    style={styles.dropdownThemed}
+                    placeholderStyle={styles.placeholderStyleThemed}
+                    selectedTextStyle={styles.selectedTextStyleThemed}
+                    inputSearchStyle={styles.inputSearchStyleThemed}
+                    containerStyle={{ borderRadius: 8, borderColor: '#DADADA' }}
+                    itemTextStyle={{ color: '#4A4A4A' }}
+                    activeColor="#F2EFEA"
                     iconStyle={styles.iconStyle}
                     data={roastLevelOptions}
                     maxHeight={300}
@@ -509,8 +538,11 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
                     value={newBean.flavorNotes?.join(', ')}
                     onChangeText={(text: string) => setNewBean({ ...newBean, flavorNotes: text.split(',').map((note: string) => note.trim()).filter((note: string) => note) })}
                     placeholder="e.g., Blueberry, Chocolate, Citrus"
-                    containerStyle={{ marginTop: 8, marginBottom: 8 }}
-                    labelStyle={styles.inputLabel}
+                    containerStyle={{ marginTop: 16, marginBottom: 8, paddingHorizontal: 0 }}
+                    inputContainerStyle={styles.inputContainerStyle}
+                    inputStyle={styles.inputStyle}
+                    labelStyle={styles.inputLabelThemed}
+                    placeholderTextColor="#A8B9AE"
                   />
                   
                   <Input
@@ -520,65 +552,71 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
                     placeholder="Additional notes about this coffee"
                     multiline
                     numberOfLines={3}
-                    containerStyle={{ marginBottom: 8 }}
-                    labelStyle={styles.inputLabel}
+                    containerStyle={{ marginBottom: 8, paddingHorizontal: 0 }}
+                    inputContainerStyle={[styles.inputContainerStyle, { minHeight: 80, paddingTop: 10 }]}
+                    inputStyle={[styles.inputStyle, { textAlignVertical: 'top'}]}
+                    labelStyle={styles.inputLabelThemed}
+                    placeholderTextColor="#A8B9AE"
                   />
                 </View>
               </ScrollView>
               
-              <View className="absolute bottom-0 left-0 right-0 bg-white py-2.5 px-4 border-t border-gray-200 z-50 shadow-lg">
+              <View className="absolute bottom-0 left-0 right-0 bg-soft-off-white py-2.5 px-4 border-t border-pale-gray z-50 shadow-lg">
                 <Button
                   title="Save Bean"
                   onPress={addBean}
                   loading={loading}
-                  buttonStyle={{ backgroundColor: '#43a047', height: 48, borderRadius: 8 }}
+                  buttonStyle={{ backgroundColor: '#D4E2D4', height: 48, borderRadius: 8 }}
+                  titleStyle={{ color: '#4A4A4A', fontWeight: 'bold' }}
                   containerStyle={{ width: '100%' }}
+                  loadingProps={{ color: '#4A4A4A' }}
                 />
               </View>
             </View>
           ) : (
-            <ScrollView className="flex-1">
+            <ScrollView className="flex-1 px-3 pt-2">
               {beans.length === 0 ? (
-                <Card containerStyle={{ marginHorizontal: 12, marginVertical: 16, borderRadius: 10, padding: 24, alignItems: 'center', backgroundColor: 'white' }}>
-                  <Text className="text-lg font-semibold text-gray-800 mb-2">No beans added yet</Text>
-                  <Text className="text-sm text-gray-500 text-center">
-                    Add your first coffee bean by taking a photo of the package
+                <Card containerStyle={{ marginHorizontal: 0, marginVertical: 16, borderRadius: 12, padding: 24, alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E7E7E7' }}>
+                  <Icon name="coffee-off-outline" type="material-community" size={40} color="#A8B9AE" />
+                  <Text className="text-lg font-semibold text-charcoal mt-3 mb-2">No beans added yet</Text>
+                  <Text className="text-sm text-cool-gray-green text-center">
+                    Add your first coffee bean using the 'Add Bean' button above.
                   </Text>
                 </Card>
               ) : (
                 beans.map((bean) => (
-                  <Card key={bean.id} containerStyle={{ marginHorizontal: 12, marginBottom: 12, borderRadius: 10, padding: 16, backgroundColor: 'white' }}>
-                    <View className="flex-row">
+                  <Card key={bean.id} containerStyle={{ marginHorizontal: 0, marginBottom: 16, borderRadius: 12, padding: 0, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E7E7E7', shadowColor: '#A8B9AE', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }}>
+                    <View className="flex-row p-4">
                       {bean.photo ? (
-                        <Image source={{ uri: bean.photo }} className="w-20 h-20 rounded-lg" />
+                        <Image source={{ uri: bean.photo }} className="w-20 h-20 rounded-lg border border-pebble-gray" />
                       ) : (
-                        <View className="w-20 h-20 rounded-lg bg-gray-200 justify-center items-center">
-                          <Icon name="coffee" type="material" size={24} color="#bdbdbd" />
+                        <View className="w-20 h-20 rounded-lg bg-light-beige justify-center items-center border border-dashed border-pebble-gray">
+                          <Icon name="landscape" type="material" size={30} color="#A8B9AE" />
                         </View>
                       )}
-                      
-                      <View className="flex-1 ml-3">
-                        <View className="flex-row justify-between">
-                          <Text className="text-lg font-semibold text-gray-800">{bean.name}</Text>
-                          <TouchableOpacity onPress={() => deleteBean(bean.id)}>
-                            <Icon name="delete" type="material" size={20} color="#f44336" />
+
+                      <View className="flex-1 ml-4">
+                        <View className="flex-row justify-between items-start">
+                          <Text className="text-lg font-semibold text-charcoal flex-shrink mr-2" numberOfLines={2}>{bean.name}</Text>
+                          <TouchableOpacity onPress={() => deleteBean(bean.id)} className="p-1 -mt-1 -mr-1">
+                            <Icon name="close-circle-outline" type="material-community" size={22} color="#A8B9AE" />
                           </TouchableOpacity>
                         </View>
-                        
-                        <Divider style={{ marginVertical: 8 }} />
-                        
+
+                        <Divider style={{ marginVertical: 8, backgroundColor: '#E7E7E7' }} />
+
                         <View className="flex-1">
-                          <Text className="text-sm text-gray-700 mb-0.5">
-                            Roast: {roastLevelOptions.find(o => o.value === bean.roastLevel)?.label || bean.roastLevel || 'Unknown'}
+                          <Text className="text-sm text-charcoal mb-0.5">
+                            Roast: <Text className="font-medium">{roastLevelOptions.find(o => o.value === bean.roastLevel)?.label || bean.roastLevel || 'Unknown'}</Text>
                           </Text>
                           
                           {bean.flavorNotes && bean.flavorNotes.length > 0 && (
-                            <View className="mt-1">
-                              <Text className="text-sm text-gray-700">Flavor Notes:</Text>
-                              <View className="flex-row flex-wrap mt-1 mb-2">
+                            <View className="mt-1.5">
+                              <Text className="text-sm text-charcoal mb-1">Flavor Notes:</Text>
+                              <View className="flex-row flex-wrap">
                                 {bean.flavorNotes.map((note: string, index: number) => (
-                                  <View key={index} className="bg-blue-100 px-2 py-0.5 rounded-full mr-1.5 mb-1.5">
-                                    <Text className="text-xs text-blue-700">{note.trim()}</Text>
+                                  <View key={index} className="bg-mist-blue/50 px-2 py-0.5 rounded-full mr-1.5 mb-1.5 border border-mist-blue">
+                                    <Text className="text-xs text-charcoal">{note.trim()}</Text>
                                   </View>
                                 ))}
                               </View>
@@ -586,42 +624,48 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
                           )}
                           
                           {bean.description && (
-                            <Text className="text-sm text-gray-700 mt-2 italic">{bean.description}</Text>
+                            <Text className="text-sm text-charcoal/80 mt-2 italic" numberOfLines={2}>{bean.description}</Text>
                           )}
-                          
-                          <Text className="text-xs text-gray-400 mt-2 text-right">Added: {formatDate(bean.timestamp)}</Text>
 
-                          <View className="flex-row justify-around mt-4 pt-3 border-t border-gray-100">
-                            <TouchableOpacity 
-                              className="flex-1 items-center px-1 py-1" 
-                              onPress={() => router.push({ pathname: '/', params: { beanName: bean.name } })}
-                            >
-                              <Icon name="local-cafe" type="material" size={20} color="#607d8b" />
-                              <Text className="text-xs text-center text-[#607d8b] mt-1">Brew</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity 
-                              className="flex-1 items-center px-1 py-1 border-l border-r border-gray-100" 
-                              onPress={() => router.push({ pathname: '/brews', params: { beanName: bean.name } })}
-                            >
-                              <Icon name="history" type="material" size={20} color="#607d8b" />
-                              <Text className="text-xs text-center text-[#607d8b] mt-1">Review</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity 
-                              className="flex-1 items-center px-1 py-1" 
-                              onPress={() => getOptimalBrewSuggestions(bean)}
-                            >
-                              <Icon name="science" type="material" size={20} color="#5e35b1" />
-                              <Text className="text-xs text-center text-[#5e35b1] mt-1">Suggest</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <Text className="text-xs text-cool-gray-green mt-2 text-right">Added: {formatDate(bean.timestamp)}</Text>
                         </View>
                       </View>
                     </View>
+                    
+                    <View className="flex-row justify-around items-center mt-2 pt-3 pb-2 border-t border-pale-gray bg-soft-off-white/50 rounded-b-lg">
+                        <TouchableOpacity
+                          className="flex-1 items-center px-1 py-1"
+                          onPress={() => router.push({ pathname: '/', params: { beanName: bean.name } })}
+                        >
+                          <Image source={require('../../assets/images/brew.png')} style={{ width:52, height: 52 }} />
+                          <Text className="text-xs text-center text-cool-gray-green mt-1 font-medium">Brew</Text>
+                        </TouchableOpacity>
+
+                        <View className="h-full w-px bg-pale-gray" />
+
+                        <TouchableOpacity
+                          className="flex-1 items-center px-1 py-1"
+                          onPress={() => router.push({ pathname: '/brews', params: { beanName: bean.name } })}
+                        >
+                          <Image source={require('../../assets/images/past_brews.png')} style={{ width: 52, height: 52 }} />
+                          <Text className="text-xs text-center text-cool-gray-green mt-1 font-medium">History</Text>
+                        </TouchableOpacity>
+
+                         <View className="h-full w-px bg-pale-gray" />
+
+                        <TouchableOpacity
+                          className="flex-1 items-center px-1 py-1"
+                          onPress={() => getOptimalBrewSuggestions(bean)}
+                        >
+                          <Image source={require('../../assets/images/suggest_brew.png')} style={{ width: 52, height: 52 }} />
+                          <Text className="text-xs text-center text-cool-gray-green mt-1 font-medium">Suggest</Text>
+                        </TouchableOpacity>
+                      </View>
                   </Card>
                 ))
               )}
+              
+              <View className="h-5" />
             </ScrollView>
           )}
         </View>
@@ -633,33 +677,39 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
         visible={suggestionModalVisible}
         onRequestClose={() => setSuggestionModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="w-[90%] bg-white rounded-2xl p-5 max-h-[80%] shadow-lg">
-            <Text className="text-xl font-semibold text-center text-gray-800">
-              {selectedBeanForSuggestion?.name || 'Bean'} Optimal Brew
-            </Text>
-            
-            <Divider style={{ marginVertical: 12 }} />
-            
-            <ScrollView style={{ maxHeight: 400 }}>
+        <View className="flex-1 justify-center items-center bg-charcoal/60 p-5">
+          <View className="w-full bg-soft-off-white rounded-2xl p-5 max-h-[80%] shadow-lg border border-pale-gray">
+            <View className="flex-row justify-between items-center">
+               <Text className="text-xl font-semibold text-charcoal flex-1 mr-2" numberOfLines={1}>
+                 {selectedBeanForSuggestion?.name || 'Bean'} Suggestion
+               </Text>
+               <TouchableOpacity onPress={() => setSuggestionModalVisible(false)} className="p-1">
+                  <Icon name="close" type="material" size={24} color="#A8B9AE" />
+               </TouchableOpacity>
+            </View>
+
+            <Divider style={{ marginVertical: 12, backgroundColor: '#E7E7E7' }} />
+
+            <ScrollView style={{ maxHeight: 400 }} className="mb-4">
               {gettingSuggestion ? (
                 <View className="items-center justify-center py-8">
-                  <ActivityIndicator size="large" color="#2196f3" />
-                  <Text className="mt-3 text-gray-500">
+                  <ActivityIndicator size="large" color="#A8B9AE" />
+                  <Text className="mt-3 text-cool-gray-green">
                     Analyzing brewing data...
                   </Text>
                 </View>
               ) : (
-                <Text className="text-base leading-relaxed text-gray-800">
+                <Text className="text-base leading-relaxed text-charcoal">
                   {beanSuggestion || 'No suggestions available.'}
                 </Text>
               )}
             </ScrollView>
-            
+
             <Button
               title="Close"
               onPress={() => setSuggestionModalVisible(false)}
-              buttonStyle={{ borderRadius: 8, marginTop: 16 }}
+              buttonStyle={{ backgroundColor: '#E7E7E7', borderRadius: 8, paddingVertical: 10 }}
+              titleStyle={{ color: '#4A4A4A', fontWeight: 'bold' }}
             />
           </View>
         </View>
@@ -668,40 +718,54 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
   );
 }
 
-// Add styles for Dropdown and consistent Input Label
 const styles = StyleSheet.create({
-  inputLabel: {
-    fontSize: 16,
-    color: '#86939e',
-    fontWeight: 'bold',
+  inputLabelThemed: {
+    fontSize: 14,
+    color: '#A8B9AE',
+    fontWeight: '600',
     marginBottom: 6,
+    marginLeft: 10
   },
-  dropdown: {
-    height: 50,
-    borderColor: '#ccc',
+  inputContainerStyle: {
     borderWidth: 1,
-    borderRadius: 4,
+    borderColor: '#DADADA',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#FAFAF9',
+    height: 50
+  },
+  inputStyle: {
+    fontSize: 16,
+    color: '#4A4A4A',
+  },
+  dropdownThemed: {
+    height: 50,
+    borderColor: '#DADADA',
+    borderWidth: 1,
+    borderRadius: 8,
     paddingHorizontal: 10,
     marginBottom: 8,
-    backgroundColor: 'white',
+    backgroundColor: '#FAFAF9',
   },
-  placeholderStyle: {
+  placeholderStyleThemed: {
     fontSize: 16,
-    color: '#adb5bd',
+    color: '#A8B9AE',
   },
-  selectedTextStyle: {
+  selectedTextStyleThemed: {
     fontSize: 16,
-    color: 'black',
+    color: '#4A4A4A',
   },
   iconStyle: {
     width: 20,
     height: 20,
   },
-  inputSearchStyle: {
+  inputSearchStyleThemed: {
     height: 40,
     fontSize: 16,
-    borderColor: '#ccc',
+    borderColor: '#DADADA',
     borderWidth: 1,
     borderRadius: 4,
+    color: '#4A4A4A',
+    backgroundColor: '#FFFFFF'
   },
 }); 
