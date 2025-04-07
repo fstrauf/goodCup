@@ -6,13 +6,21 @@ import { HapticTab } from '../../components/HapticTab';
 import { IconSymbol } from '../../components/ui/IconSymbol';
 import TabBarBackground from '../../components/ui/TabBarBackground';
 
+// --- Tailwind ---
+import resolveConfig from 'tailwindcss/resolveConfig';
+import tailwindConfig from '../../tailwind.config.js'; // Adjust path if necessary
+
+const fullConfig = resolveConfig(tailwindConfig);
+const themeColors = fullConfig.theme.colors as unknown as Record<string, string>; 
+// --- End Tailwind ---
+
 export default function TabLayout() {
   return (
     <Tabs
       initialRouteName="index" // Start on the Beans tab
       screenOptions={{
-        tabBarActiveTintColor: '#A8B9AE',
-        tabBarInactiveTintColor: '#DADADA',
+        tabBarActiveTintColor: themeColors['cool-gray-green'], // Use theme color (darker green)
+        tabBarInactiveTintColor: themeColors['pebble-gray'], // Use theme color
         headerShown: false, // We'll use the Stack header from the root layout
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
@@ -24,8 +32,8 @@ export default function TabLayout() {
             elevation: 0,
           },
           default: {
-            backgroundColor: '#FAFAF9',
-            borderTopColor: '#E7E7E7',
+            backgroundColor: themeColors['soft-off-white'], // Use theme color
+            borderTopColor: themeColors['pale-gray'], // Use theme color
           },
         }),
       }}>

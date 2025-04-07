@@ -211,13 +211,10 @@ export const analyzeImage = async (base64Image: string): Promise<any> => {
               type: 'text',
               text: 'This is a photo of a coffee bean package. Please extract and provide the following information in JSON format:\n' +
                     '1. Bean name\n' +
-                    '2. Roaster name\n' +
-                    '3. Country/region of origin\n' +
-                    '4. Processing method\n' +
-                    '5. Roast level\n' +
-                    '6. Flavor notes (as an array of strings)\n' +
-                    '7. Description\n\n' +
-                    'If you cannot determine any field, use "Unknown" or an empty array for flavor notes. Return ONLY valid JSON with these fields.'
+                    '2. Roast level (Use only one of these specific values: Light, Medium-Light, Medium, Medium-Dark, Dark. Infer this from the description/label if possible.)\n' +
+                    '3. Flavor notes (as an array of strings)\n' +
+                    '4. Description\n\n' +
+                    'If you cannot determine a field, use "Unknown" or an empty array for flavor notes. Return ONLY valid JSON with these fields.'
             },
             {
               type: 'image_url',
@@ -230,19 +227,27 @@ export const analyzeImage = async (base64Image: string): Promise<any> => {
       ],
       max_tokens: 1000
     });
+
+    console.log('response', response);
     
     const content = response.choices[0]?.message?.content;
     
     if (content) {
       // Extract JSON from the response (handling potential text before or after JSON)
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      const jsonString = jsonMatch ? jsonMatch[0] : content;
-      return JSON.parse(jsonString);
+      const jsonString = jsonMatch ? jsonMatch[0] : content; // Attempt to find JSON block
+      try {
+        return JSON.parse(jsonString); // Parse the extracted JSON
+      } catch (parseError) {
+         console.error('Failed to parse JSON from OpenAI response:', jsonString, parseError);
+         throw new Error('Failed to parse image analysis data.');
+      }
     }
     
     throw new Error('No content returned from OpenAI');
   } catch (error) {
     console.error('Error analyzing image:', error);
-    throw error;
+    // Re-throw the error to be caught by the calling function (analyzePhoto in index.tsx)
+    throw error; 
   }
 }; 

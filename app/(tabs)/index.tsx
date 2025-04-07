@@ -8,6 +8,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { analyzeImage, createOpenAIClient, getBrewSuggestions } from '../../lib/openai';
 import { Dropdown } from 'react-native-element-dropdown';
 
+// --- Tailwind ---
+import resolveConfig from 'tailwindcss/resolveConfig';
+import tailwindConfig from '../../tailwind.config.js'; // Adjust path if necessary
+
+const fullConfig = resolveConfig(tailwindConfig);
+// Cast through unknown to satisfy TS with the potentially complex resolved type
+const themeColors = fullConfig.theme.colors as unknown as Record<string, string>;
+// --- End Tailwind ---
+
 // Storage keys
 const BEANS_STORAGE_KEY = '@GoodCup:beans';
 const BREWS_STORAGE_KEY = '@GoodCup:brews';
@@ -41,9 +50,11 @@ interface Brew {
 
 // Roast Level Options for Dropdown
 const roastLevelOptions = [
-  { label: 'Light', value: 'light' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'Dark', value: 'dark' },
+  { label: 'Light', value: '1' },
+  { label: 'Medium-Light', value: '2' },
+  { label: 'Medium', value: '3' },
+  { label: 'Medium-Dark', value: '4' },
+  { label: 'Dark', value: '5' },
   { label: 'Unknown', value: 'unknown' },
 ];
 
@@ -72,54 +83,22 @@ export default function BeansScreen() {
   // Load beans from all sources
   const loadBeans = useCallback(async () => {
     try {
-      // Get beans from beans storage
+      // Get beans from beans storage ONLY
       const storedBeans = await AsyncStorage.getItem(BEANS_STORAGE_KEY);
       let beansArray: Bean[] = [];
       
       if (storedBeans) {
         beansArray = JSON.parse(storedBeans);
-      }
-      
-      // Get beans from brews data
-      const storedBrews = await AsyncStorage.getItem(BREWS_STORAGE_KEY);
-      
-      if (storedBrews) {
-        const brews: Brew[] = JSON.parse(storedBrews);
-        
-        // Extract unique bean names from brews
-        const brewBeanNames = Array.from(new Set(brews.map(brew => brew.beanName)));
-        
-        // For each bean name that doesn't exist in our beans array, create a basic bean entry
-        for (const beanName of brewBeanNames) {
-          if (beanName && !beansArray.some(bean => bean.name === beanName)) {
-            // Find the highest rated brew for this bean to get description
-            const relatedBrews = brews.filter(brew => brew.beanName === beanName);
-            const highestRatedBrew = relatedBrews.sort((a, b) => b.rating - a.rating)[0];
-            
-            // Create a basic bean entry
-            const newBeanEntry: Bean = {
-              id: `brew-bean-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              name: beanName,
-              roastLevel: 'unknown',
-              flavorNotes: [],
-              description: highestRatedBrew?.notes || '',
-              timestamp: highestRatedBrew?.timestamp || Date.now()
-            };
-            
-            beansArray.push(newBeanEntry);
-          }
-        }
-        
         // Sort beans by timestamp (newest first)
         beansArray.sort((a, b) => b.timestamp - a.timestamp);
-        
-        // Save the updated beans array if we added any new ones
-        if (beansArray.length > 0 && (!storedBeans || beansArray.length > JSON.parse(storedBeans).length)) {
-          await AsyncStorage.setItem(BEANS_STORAGE_KEY, JSON.stringify(beansArray));
-        }
       }
       
-      setBeans(beansArray);
+      // --- REMOVED Logic to load/create beans from BREWS_STORAGE_KEY ---
+      // const storedBrews = await AsyncStorage.getItem(BREWS_STORAGE_KEY);
+      // if (storedBrews) { ... logic to create newBeanEntry ... } 
+      // --- END REMOVED ---
+      
+      setBeans(beansArray); // Set state only with explicitly saved beans
     } catch (error) {
       console.error('Error loading beans:', error);
       Alert.alert('Error', 'Failed to load beans.');
@@ -284,15 +263,21 @@ export default function BeansScreen() {
       // Use the new analyzeImage function from our OpenAI utility
       const extractedData = await analyzeImage(base64Image);
       
+      // Access properties using bracket notation with exact keys from JSON response
+      const beanName = extractedData["Bean name"];
+      const roastLevel = extractedData["Roast level"];
+      const flavorNotes = extractedData["Flavor notes"];
+      const description = extractedData["Description"];
+      
       // Update form with extracted data
-      const validRoastLevel = roastLevelOptions.find(o => o.label.toLowerCase() === extractedData.roastLevel?.toLowerCase())?.value;
+      const validRoastLevel = roastLevelOptions.find(o => o.label.toLowerCase() === roastLevel?.toLowerCase())?.value;
 
       setNewBean(prev => ({
         ...prev,
-        name: extractedData.name || prev.name,
+        name: beanName || prev.name, 
         roastLevel: validRoastLevel || prev.roastLevel || 'unknown',
-        flavorNotes: extractedData.flavorNotes || prev.flavorNotes,
-        description: extractedData.description || prev.description
+        flavorNotes: flavorNotes || prev.flavorNotes,
+        description: description || prev.description
       }));
       
       Alert.alert('Analysis Complete', 'Information extracted from the package photo. Please review and edit if needed.');
@@ -421,10 +406,10 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
             marginBottom: 8,
             borderRadius: 12,
             padding: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: themeColors['soft-off-white'],
             borderWidth: 1,
-            borderColor: '#E7E7E7',
-            shadowColor: '#A8B9AE',
+            borderColor: themeColors['pale-gray'],
+            shadowColor: themeColors['cool-gray-green'],
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.1,
             shadowRadius: 2,
@@ -433,17 +418,17 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
             <View className="flex-row items-center justify-between">
               <Text className="text-2xl font-semibold text-charcoal">Coffee Beans</Text>
               <Button
-                icon={{ name: 'add', color: showAddForm ? '#4A4A4A' : '#FFFFFF', size: 22 }}
+                icon={{ name: 'add', color: showAddForm ? themeColors['charcoal'] : themeColors['soft-off-white'], size: 22 }}
                 title={showAddForm ? "Cancel" : "Add Bean"}
                 onPress={() => setShowAddForm(!showAddForm)}
                 buttonStyle={{
                   borderRadius: 8,
                   paddingHorizontal: 12,
                   paddingVertical: 8,
-                  backgroundColor: showAddForm ? '#E7E7E7' : '#A8B9AE'
+                  backgroundColor: showAddForm ? themeColors['pale-gray'] : themeColors['cool-gray-green']
                 }}
                 titleStyle={{
-                  color: showAddForm ? '#4A4A4A' : '#FFFFFF',
+                  color: showAddForm ? themeColors['charcoal'] : themeColors['soft-off-white'],
                   marginLeft: 5
                 }}
               />

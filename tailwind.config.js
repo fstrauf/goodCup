@@ -10,7 +10,7 @@ module.exports = {
         'light-beige': '#F2EFEA',
         'pale-gray': '#E7E7E7',
         'muted-sage-green': '#D4E2D4',
-        'cool-gray-green': '#A8B9AE',
+        'cool-gray-green': '#8F9E93',
         'mist-blue': '#C9D8D3', // Secondary Accent
         'charcoal': '#4A4A4A', // Secondary Accent (for text)
         'pebble-gray': '#DADADA', // Secondary Accent

@@ -7,6 +7,14 @@ import { Dropdown } from 'react-native-element-dropdown';
 import { Input, Slider, Switch, Card, Divider, Button as RNEButton } from '@rneui/themed';
 import { useLocalSearchParams } from 'expo-router';
 
+// --- Tailwind ---
+import resolveConfig from 'tailwindcss/resolveConfig';
+import tailwindConfig from '../../../tailwind.config.js'; // Adjust path
+
+const fullConfig = resolveConfig(tailwindConfig);
+const themeColors = fullConfig.theme.colors as unknown as Record<string, string>; 
+// --- End Tailwind ---
+
 const BREWS_STORAGE_KEY = '@GoodCup:brews';
 const BREW_DEVICES_KEY = '@GoodCup:brewDevices';
 const GRINDERS_KEY = '@GoodCup:grinders';
@@ -252,7 +260,7 @@ const HomeScreenComponent = () => {
   if (!beanName) {
     return (
       <SafeAreaView className="flex-1 bg-soft-off-white justify-center items-center">
-        <ActivityIndicator size="large" color="#A8B9AE" />
+        <ActivityIndicator size="large" color={themeColors['cool-gray-green']} />
         <Text className="text-cool-gray-green mt-2">Loading bean...</Text>
       </SafeAreaView>
     );
@@ -270,15 +278,15 @@ const HomeScreenComponent = () => {
 
           <Card 
             containerStyle={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: themeColors['soft-off-white'],
               borderRadius: 12,
               borderWidth: 1, 
-              borderColor: '#E7E7E7',
+              borderColor: themeColors['pale-gray'],
               paddingHorizontal: 0,
               paddingVertical: 0,
               marginBottom: 24,
               marginHorizontal: 0,
-              shadowColor: '#A8B9AE',
+              shadowColor: themeColors['cool-gray-green'],
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
               shadowRadius: 4,
@@ -304,11 +312,11 @@ const HomeScreenComponent = () => {
                   maximumValue={300}
                   step={5}
                   allowTouchTrack={true}
-                  minimumTrackTintColor="#A8B9AE"
-                  maximumTrackTintColor="#E7E7E7"
-                  thumbTintColor="#A8B9AE"
+                  minimumTrackTintColor={themeColors['cool-gray-green']}
+                  maximumTrackTintColor={themeColors['pale-gray']}
+                  thumbTintColor={themeColors['cool-gray-green']}
                   trackStyle={{ height: 6, borderRadius: 3 }}
-                  thumbStyle={{ height: 20, width: 20, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#A8B9AE' }}
+                  thumbStyle={{ height: 20, width: 20, backgroundColor: themeColors['soft-off-white'], borderWidth: 2, borderColor: themeColors['cool-gray-green'] }}
                 />
               </View>
 
@@ -317,7 +325,7 @@ const HomeScreenComponent = () => {
                 <Switch
                   value={useBloom}
                   onValueChange={setUseBloom}
-                  color="#A8B9AE"
+                  color={themeColors['cool-gray-green']}
                 />
               </View>
 
@@ -328,16 +336,16 @@ const HomeScreenComponent = () => {
                     value={bloomTime}
                     onChangeText={setBloomTime}
                     placeholder="Minutes:Seconds"
-                    placeholderTextColor="#A8B9AE"
+                    placeholderTextColor={themeColors['cool-gray-green']}
                     keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
                     inputContainerStyle={{
                       borderWidth: 1,
-                      borderColor: '#DADADA',
+                      borderColor: themeColors['pebble-gray'],
                       borderRadius: 8,
                       paddingHorizontal: 10,
-                      backgroundColor: '#FAFAF9',
+                      backgroundColor: themeColors['soft-off-white'],
                     }}
-                    inputStyle={{ color: '#4A4A4A' }}
+                    inputStyle={{ color: themeColors['charcoal'] }}
                   />
                 </View>
               )}
@@ -348,15 +356,15 @@ const HomeScreenComponent = () => {
                   value={grindSize}
                   onChangeText={setGrindSize}
                   placeholder="Medium-Fine, 18 clicks, etc."
-                  placeholderTextColor="#A8B9AE"
+                  placeholderTextColor={themeColors['cool-gray-green']}
                   inputContainerStyle={{
                      borderWidth: 1, 
-                     borderColor: '#DADADA', 
+                     borderColor: themeColors['pebble-gray'],
                      borderRadius: 8, 
                      paddingHorizontal: 10,
-                     backgroundColor: '#FAFAF9'
+                     backgroundColor: themeColors['soft-off-white']
                   }}
-                  inputStyle={{ color: '#4A4A4A' }}
+                  inputStyle={{ color: themeColors['charcoal'] }}
                 />
               </View>
 
@@ -366,21 +374,21 @@ const HomeScreenComponent = () => {
                   value={waterTemp}
                   onChangeText={setWaterTemp}
                   placeholder="96°C or 205°F"
-                  placeholderTextColor="#A8B9AE"
+                  placeholderTextColor={themeColors['cool-gray-green']}
                   keyboardType="numeric"
                   inputContainerStyle={{
                     borderWidth: 1, 
-                    borderColor: '#DADADA', 
+                    borderColor: themeColors['pebble-gray'],
                     borderRadius: 8, 
                     paddingHorizontal: 10,
-                    backgroundColor: '#FAFAF9'
+                    backgroundColor: themeColors['soft-off-white']
                   }}
-                   inputStyle={{ color: '#4A4A4A' }}
+                   inputStyle={{ color: themeColors['charcoal'] }}
                 />
               </View>
             </View>
 
-            <Divider style={{ marginVertical: 16, backgroundColor: '#E7E7E7', height: 1 }} />
+            <Divider style={{ marginVertical: 16, backgroundColor: themeColors['pale-gray'], height: 1 }} />
             
             <View className="px-4 pb-2">
               <Text className="text-lg font-semibold text-charcoal mb-3">Rating & Notes</Text>
@@ -396,11 +404,11 @@ const HomeScreenComponent = () => {
                   maximumValue={10}
                   step={1}
                   allowTouchTrack={true}
-                  minimumTrackTintColor="#A8B9AE"
-                  maximumTrackTintColor="#E7E7E7"
-                  thumbTintColor="#A8B9AE"
+                  minimumTrackTintColor={themeColors['cool-gray-green']}
+                  maximumTrackTintColor={themeColors['pale-gray']}
+                  thumbTintColor={themeColors['cool-gray-green']}
                   trackStyle={{ height: 6, borderRadius: 3 }}
-                  thumbStyle={{ height: 20, width: 20, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#A8B9AE' }}
+                  thumbStyle={{ height: 20, width: 20, backgroundColor: themeColors['soft-off-white'], borderWidth: 2, borderColor: themeColors['cool-gray-green'] }}
                 />
               </View>
 
@@ -410,20 +418,20 @@ const HomeScreenComponent = () => {
                   value={notes}
                   onChangeText={setNotes}
                   placeholder="Tasting notes, observations, etc."
-                  placeholderTextColor="#A8B9AE"
+                  placeholderTextColor={themeColors['cool-gray-green']}
                   multiline
                   numberOfLines={4}
                   inputContainerStyle={{
                     borderWidth: 1,
-                    borderColor: '#DADADA',
+                    borderColor: themeColors['pebble-gray'],
                     borderRadius: 8,
                     paddingHorizontal: 10,
                     paddingVertical: 8,
                     minHeight: 100,
-                    backgroundColor: '#FAFAF9'
+                    backgroundColor: themeColors['soft-off-white']
                   }}
                   inputStyle={{
-                    color: '#4A4A4A',
+                    color: themeColors['charcoal'],
                     textAlignVertical: 'top',
                     paddingTop: Platform.OS === 'ios' ? 0 : 0,
                     minHeight: 80,
@@ -439,17 +447,17 @@ const HomeScreenComponent = () => {
                 <Dropdown
                   style={{
                     height: 50,
-                    borderColor: '#DADADA',
+                    borderColor: themeColors['pebble-gray'],
                     borderWidth: 1,
                     borderRadius: 8,
                     paddingHorizontal: 10,
-                    backgroundColor: '#FAFAF9'
+                    backgroundColor: themeColors['soft-off-white']
                   }}
-                  placeholderStyle={{ color: '#A8B9AE' }}
-                  selectedTextStyle={{ color: '#4A4A4A' }}
-                  containerStyle={{ borderRadius: 8, borderColor: '#DADADA' }}
-                  itemTextStyle={{ color: '#4A4A4A' }}
-                  activeColor="#F2EFEA"
+                  placeholderStyle={{ color: themeColors['cool-gray-green'] }}
+                  selectedTextStyle={{ color: themeColors['charcoal'] }}
+                  containerStyle={{ borderRadius: 8, borderColor: themeColors['pebble-gray'] }}
+                  itemTextStyle={{ color: themeColors['charcoal'] }}
+                  activeColor={themeColors['light-beige']}
                   data={brewDeviceOptions}
                   maxHeight={300}
                   labelField="label"
@@ -469,17 +477,17 @@ const HomeScreenComponent = () => {
                 <Dropdown
                    style={{
                     height: 50,
-                    borderColor: '#DADADA',
+                    borderColor: themeColors['pebble-gray'],
                     borderWidth: 1,
                     borderRadius: 8,
                     paddingHorizontal: 10,
-                    backgroundColor: '#FAFAF9'
+                    backgroundColor: themeColors['soft-off-white']
                   }}
-                  placeholderStyle={{ color: '#A8B9AE' }}
-                  selectedTextStyle={{ color: '#4A4A4A' }}
-                  containerStyle={{ borderRadius: 8, borderColor: '#DADADA' }}
-                  itemTextStyle={{ color: '#4A4A4A' }}
-                  activeColor="#F2EFEA"
+                  placeholderStyle={{ color: themeColors['cool-gray-green'] }}
+                  selectedTextStyle={{ color: themeColors['charcoal'] }}
+                  containerStyle={{ borderRadius: 8, borderColor: themeColors['pebble-gray'] }}
+                  itemTextStyle={{ color: themeColors['charcoal'] }}
+                  activeColor={themeColors['light-beige']}
                   data={grinderOptions}
                   maxHeight={300}
                   labelField="label"
@@ -495,18 +503,18 @@ const HomeScreenComponent = () => {
               </View>
             </View>
 
-            <Divider style={{ marginVertical: 16, backgroundColor: '#E7E7E7', height: 1 }} />        
+            <Divider style={{ marginVertical: 16, backgroundColor: themeColors['pale-gray'], height: 1 }} />       
 
             <View className="px-4 pt-4 pb-4">
               <RNEButton
                 title="Save Brew"
                 onPress={handleSaveBrew}
-                buttonStyle={{ backgroundColor: '#D4E2D4', borderRadius: 8, height: 50 }}
-                titleStyle={{ color: '#4A4A4A', fontWeight: 'bold' }}
+                buttonStyle={{ backgroundColor: themeColors['muted-sage-green'], borderRadius: 8, height: 50 }}
+                titleStyle={{ color: themeColors['charcoal'], fontWeight: 'bold' }}
                 raised
                 disabled={!beanName}
-                disabledStyle={{ backgroundColor: '#E7E7E7' }}
-                disabledTitleStyle={{ color: '#A8B9AE' }}
+                disabledStyle={{ backgroundColor: themeColors['pale-gray'] }}
+                disabledTitleStyle={{ color: themeColors['cool-gray-green'] }}
               />
             </View>
 

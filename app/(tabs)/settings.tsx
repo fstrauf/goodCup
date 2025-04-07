@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Card, Text, Divider, Input, Button } from '@rneui/themed';
-import { saveApiKey, getApiKey } from '../../lib/openai';
+// import { saveApiKey, getApiKey } from '../../lib/openai';
 import { Icon } from '@rneui/base';
 
 // Storage keys
@@ -30,9 +30,9 @@ interface Grinder {
 
 export default function SettingsScreen() {
   // OpenAI state
-  const [apiKey, setApiKey] = useState('');
-  const [apiKeyMasked, setApiKeyMasked] = useState(true);
-  const [savedApiKey, setSavedApiKey] = useState<string | null>(null);
+  // const [apiKey, setApiKey] = useState('');
+  // const [apiKeyMasked, setApiKeyMasked] = useState(true);
+  // const [savedApiKey, setSavedApiKey] = useState<string | null>(null);
   
   // Brew devices state
   const [brewDevices, setBrewDevices] = useState<BrewDevice[]>([]);
@@ -60,8 +60,8 @@ export default function SettingsScreen() {
     setRefreshing(true);
     try {
       // Load API Key
-      const storedApiKey = await getApiKey();
-      setSavedApiKey(storedApiKey);
+      // const storedApiKey = await getApiKey();
+      // setSavedApiKey(storedApiKey);
       
       // Load brew devices
       const storedDevices = await AsyncStorage.getItem(BREW_DEVICES_STORAGE_KEY);
@@ -115,30 +115,30 @@ export default function SettingsScreen() {
   );
 
   // Save API Key
-  const handleSaveApiKey = async () => {
-    try {
-      await saveApiKey(apiKey);
-      setSavedApiKey(apiKey);
-      setApiKey('');
-      Alert.alert('Success', 'API key saved successfully.');
-    } catch (error) {
-      console.error('Error saving API key:', error);
-      Alert.alert('Error', 'Failed to save API key. Please try again.');
-    }
-  };
+  // const handleSaveApiKey = async () => {
+  //   try {
+  //     await saveApiKey(apiKey);
+  //     setSavedApiKey(apiKey);
+  //     setApiKey('');
+  //     Alert.alert('Success', 'API key saved successfully.');
+  //   } catch (error) {
+  //     console.error('Error saving API key:', error);
+  //     Alert.alert('Error', 'Failed to save API key. Please try again.');
+  //   }
+  // };
 
-  // Remove API Key
-  const handleRemoveApiKey = async () => {
-    try {
-      await saveApiKey('');
-      setSavedApiKey(null);
-      setApiKey('');
-      Alert.alert('Success', 'API key removed successfully.');
-    } catch (error) {
-      console.error('Error removing API key:', error);
-      Alert.alert('Error', 'Failed to remove API key. Please try again.');
-    }
-  };
+  // // Remove API Key
+  // const handleRemoveApiKey = async () => {
+  //   try {
+  //     await saveApiKey('');
+  //     setSavedApiKey(null);
+  //     setApiKey('');
+  //     Alert.alert('Success', 'API key removed successfully.');
+  //   } catch (error) {
+  //     console.error('Error removing API key:', error);
+  //     Alert.alert('Error', 'Failed to remove API key. Please try again.');
+  //   }
+  // };
 
   // Add new brew device
   const addBrewDevice = async () => {
@@ -311,7 +311,7 @@ export default function SettingsScreen() {
           <Text style={{ fontSize: 24, fontWeight: '600', color: '#333', marginBottom: 16, marginTop: 8 }}>Settings</Text>
           
           {/* OpenAI API Key Section */}
-          <View style={{ marginBottom: 24 }}>
+          {/* <View style={{ marginBottom: 24 }}>
             <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 12 }}>
               Brew Suggestions (OpenAI)
             </Text>
@@ -374,7 +374,7 @@ export default function SettingsScreen() {
                 Your API key is stored securely on your device only.
               </Text>
             </Card>
-          </View>
+          </View> */}
           
           <Divider style={{ marginBottom: 24 }} />
           
