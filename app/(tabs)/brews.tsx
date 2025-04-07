@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Text, Divider, Button } from '@rneui/themed';
 import { Dropdown } from 'react-native-element-dropdown';
-import { getBrewSuggestions, Brew } from '@/lib/openai';
+import { getBrewSuggestions, Brew } from '../../lib/openai';
 
 // Storage keys
 const BREWS_STORAGE_KEY = '@GoodCup:brews';

@@ -1,3 +1,20 @@
+// import React from 'react';
+// import { Stack } from 'expo-router';
+
+// export default function RootLayout() {
+//   return (
+//     <Stack
+//       screenOptions={{
+//         headerShown: false,
+//         contentStyle: { backgroundColor: 'white' },
+//       }}
+//     >
+//       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+//       <Stack.Screen name="index" options={{ headerShown: false }} />
+//     </Stack>
+//   );
+// }
+
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -7,7 +24,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { ThemeProvider as RNEThemeProvider } from '@rneui/themed';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();

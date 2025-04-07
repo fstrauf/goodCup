@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dropdown } from 'react-native-element-dropdown';
 import { Input, Slider, Switch, Card, Divider, Button as RNEButton } from '@rneui/themed';
-import { getBrewSuggestions } from '@/lib/openai';
+import { getBrewSuggestions } from '../../lib/openai';
 
 const BREWS_STORAGE_KEY = '@GoodCup:brews';
 const BEAN_NAMES_STORAGE_KEY = '@GoodCup:beanNames';

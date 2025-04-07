@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OpenAI from 'openai';
-import { OPENAI_API_KEY } from '@env';
 
 // Interfaces
 export interface Brew {
@@ -43,14 +42,15 @@ export const saveApiKey = async (apiKey: string): Promise<void> => {
   }
 };
 
-// Get API key from AsyncStorage or env
+// Get API key from process.env or AsyncStorage
 export const getApiKey = async (): Promise<string | null> => {
   try {
-    // First check for env variable
-    if (OPENAI_API_KEY && OPENAI_API_KEY !== 'your_openai_api_key_here') {
-      return OPENAI_API_KEY;
+    // First check process.env for Expo public env var
+    const expoApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+    if (expoApiKey && expoApiKey !== 'your_openai_api_key_here') {
+      return expoApiKey;
     }
-    
+
     // If no env variable, check AsyncStorage
     const apiKey = await AsyncStorage.getItem(API_KEY_STORAGE_KEY);
     return apiKey;

@@ -2,12 +2,13 @@
   "expo": {
     "name": "goodcup-app",
     "slug": "goodcup-app",
+    "main": "expo-router/entry",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -50,27 +51,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take photos of coffee bean packages."
-        }
-      ],
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for selecting coffee bean package images.",
-          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos of coffee beans.",
-          "isAccessMediaLocationEnabled": true
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for selecting coffee bean package images."
-        }
-      ]
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true

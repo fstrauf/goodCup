@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Card, Text, Divider, Input, Button } from '@rneui/themed';
-import { saveApiKey, getApiKey } from '@/lib/openai';
+import { saveApiKey, getApiKey } from '../../lib/openai';
 import { Icon } from '@rneui/base';
 
 // Storage keys

@@ -5,8 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Button, Card, Text, Input, Divider, Icon } from '@rneui/themed';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
-import { getApiKey, getBrewSuggestions, analyzeImage, createOpenAIClient } from '@/lib/openai';
+import { getApiKey, getBrewSuggestions, analyzeImage, createOpenAIClient } from '../../lib/openai';
 
 // Storage keys
 const BEANS_STORAGE_KEY = '@GoodCup:beans';
