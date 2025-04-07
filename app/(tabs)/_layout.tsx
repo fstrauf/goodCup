@@ -1,21 +1,19 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, Image } from 'react-native';
 
 import { HapticTab } from '../../components/HapticTab';
 import { IconSymbol } from '../../components/ui/IconSymbol';
 import TabBarBackground from '../../components/ui/TabBarBackground';
-import { useColorScheme } from '../../hooks/useColorScheme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
+      initialRouteName="index" // Start on the Beans tab
       screenOptions={{
         tabBarActiveTintColor: '#A8B9AE',
         tabBarInactiveTintColor: '#DADADA',
-        headerShown: true,
+        headerShown: false, // We'll use the Stack header from the root layout
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
@@ -30,33 +28,17 @@ export default function TabLayout() {
             borderTopColor: '#E7E7E7',
           },
         }),
-        headerStyle: {
-          backgroundColor: '#FAFAF9',
-        },
-        headerTitleStyle: {
-          color: '#4A4A4A',
-        }
       }}>
       <Tabs.Screen
-        name="beans"
+        name="index" // Corresponds to app/(tabs)/index.tsx
         options={{
           title: 'Beans',
-          tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="leaf.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Add Brew',
-          tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="plus.circle.fill" color={color} />,
-        }}
-      />
-
-      <Tabs.Screen
-        name="brews"
-        options={{
-          title: 'Brews',
-          tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="list.bullet" color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Image
+              source={require('../../assets/images/beans.png')}
+              style={{ width: 52, height: 52, tintColor: color }}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -68,4 +50,4 @@ export default function TabLayout() {
       />
     </Tabs>
   );
-}
+} 

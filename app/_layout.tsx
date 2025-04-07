@@ -11,7 +11,7 @@ import { LogBox, View } from 'react-native'; // Import LogBox and View
 
 import { useColorScheme } from '../hooks/useColorScheme';
 
-// Ignore the specific defaultProps warning from Slider
+// Ignore the specific defaul tProps warning from Slider
 LogBox.ignoreLogs([
   'Slider: Support for defaultProps will be removed',
 ]);
@@ -41,7 +41,11 @@ export default function RootLayout() {
       <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <View className="flex-1 bg-soft-off-white"> 
           <Stack>
+            {/* Define the tabs group. headerShown: false hides the Stack header FOR the tabs screen itself */}
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            {/* Dynamic routes remain directly under the Stack */}
+            <Stack.Screen name="[beanId]/brew" options={{ title: 'Add Brew' }} />
+            <Stack.Screen name="[beanId]/brews" options={{ title: 'Brew History' }} />
             <Stack.Screen name="+not-found" />
           </Stack>
           <StatusBar style="auto" />
