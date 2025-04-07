@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ScrollView, Text, Platform, Alert, View, StyleSheet, ActivityIndicator } from 'react-native';
+import { ScrollView, Text, Platform, Alert, View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -77,7 +77,6 @@ const HomeScreenComponent = () => {
   const [waterTemp, setWaterTemp] = useState('');
   const [rating, setRating] = useState(5);
   const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
@@ -91,9 +90,6 @@ const HomeScreenComponent = () => {
 
   const [allBeanNames, setAllBeanNames] = useState<string[]>([]);
   const [beanNameOptions, setBeanNameOptions] = useState<BeanNameOption[]>([]);
-  const [isDropdownFocus, setIsDropdownFocus] = useState(false);
-  const [searchText, setSearchText] = useState<string>('');
-  const searchInputRef = useRef<any>(null);
 
   useEffect(() => {
     loadBeanNames();
@@ -256,47 +252,6 @@ const HomeScreenComponent = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handleDropdownChange = (item: { label: string; value: string }) => {
-    console.log("[handleDropdownChange] Selected:", item);
-    
-    // Update the bean name state
-    setBeanName(item.value);
-    
-    // Show bean details if available
-    if (item.value) {
-      getBeanDetails(item.value);
-    }
-    
-    // Clear search text and reset focus
-    setSearchText('');
-    setIsDropdownFocus(false);
-    
-    // Save the new bean name if it's not in the list already
-    if (item.value && !allBeanNames.includes(item.value)) {
-      saveBeanName(item.value);
-    }
-  };
-
-  const handleSearchTextSubmit = () => {
-    console.log("[handleSearchTextSubmit] Submitting text:", searchText);
-    if (searchText && searchText.trim() !== '') {
-      // This flow allows users to add a custom bean name that isn't in the dropdown list
-      // 1. User types a new bean name in the search box
-      // 2. They press Enter or the checkmark icon
-      // 3. The new name is set as the current beanName and immediately saved to AsyncStorage
-      // 4. The dropdown list will be updated with the new name via the useEffect hook that watches allBeanNames
-      setBeanName(searchText);
-      
-      // Immediately save the new bean name to AsyncStorage
-      saveBeanName(searchText).then(() => {
-        console.log("[Dropdown] New bean saved to storage:", searchText);
-      });
-      
-      setIsDropdownFocus(false);
-      setSearchText('');
-    }
-  };
-
   // Timer functionality
   const startTimer = useCallback(() => {
     if (timerActive) return;
@@ -392,23 +347,6 @@ const HomeScreenComponent = () => {
     setGettingSuggestion(false);
   };
 
-  // Reset form
-  const resetForm = () => {
-    setBeanName(null);
-    setSteepTimeSeconds(180);
-    setUseBloom(false);
-    setBloomTime('');
-    setGrindSize('');
-    setWaterTemp('');
-    setRating(5);
-    setNotes('');
-    resetTimer();
-    setSelectedBrewDevice('');
-    setSelectedGrinder('');
-    setSuggestion('');
-    setShowSuggestion(false);
-  };
-
   // Format brew devices and grinders for dropdown
   const brewDeviceOptions: DropdownItem[] = brewDevices.map(device => ({
     label: device.name,
@@ -457,90 +395,38 @@ const HomeScreenComponent = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-transparent" edges={['top', 'left', 'right']}>
-      <View className="flex-1 bg-white dark:bg-black">
+    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={['top', 'left', 'right']}>
+      <View className="flex-1 bg-white dark:bg-black px-3">
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{
-            paddingHorizontal: 12,
-            paddingBottom: 40,
-          }}
+          contentContainerStyle={{ paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
-          <Card containerStyle={{
-            borderRadius: 10,
-            paddingHorizontal: 0,
-            paddingVertical: 0,
-            paddingBottom: 15,
-            elevation: 1,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 2,
-            marginBottom: 40,
-          }}>
-            <View style={{
-              paddingHorizontal: 16,
-              paddingTop: 16,
-              paddingBottom: 8,
-            }}>
-              <View style={{ marginBottom: 16 }}>
-                <Dropdown
-                  style={{
-                    height: 50,
-                    borderColor: '#e1e1e1',
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    paddingHorizontal: 8,
-                    backgroundColor: 'white',
-                  }}
-                  placeholderStyle={{ fontSize: 16, color: '#9CA3AF' }}
-                  selectedTextStyle={{ fontSize: 16, color: '#333' }}
-                  inputSearchStyle={{ height: 40, fontSize: 16, borderColor: '#e1e1e1', borderWidth: 1, borderRadius: 8 }}
-                  containerStyle={{ backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#e1e1e1' }}
-                  itemTextStyle={{ color: '#333', fontSize: 16 }}
-                  data={beanNameOptions}
-                  search
-                  maxHeight={300}
-                  labelField="label"
-                  valueField="value"
-                  placeholder={!isDropdownFocus ? 'Select or type bean name...' : '...'}
-                  searchPlaceholder="Search or type new name..."
-                  value={beanName}
-                  onFocus={() => setIsDropdownFocus(true)}
-                  onBlur={() => setIsDropdownFocus(false)}
-                  onChange={handleDropdownChange}
-                  renderInputSearch={(onSearch) => (
-                    <Input
-                      ref={searchInputRef}
-                      placeholder="Type new bean name..."
-                      value={searchText}
-                      onChangeText={(text) => {
-                        setSearchText(text);
-                        onSearch(text);
-                      }}
-                      onSubmitEditing={handleSearchTextSubmit}
-                      returnKeyType="done"
-                      rightIcon={{
-                        type: 'ionicon',
-                        name: 'checkmark-circle-outline',
-                        onPress: handleSearchTextSubmit,
-                        color: '#2089dc'
-                      }}
-                      inputContainerStyle={{ borderBottomWidth: 0 }}
-                    />
-                  )}
-                />
-              </View>
-            </View>
+          <Card 
+            containerStyle={{
+              borderRadius: 10,
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+              elevation: 1,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              marginBottom: 40,
+              marginHorizontal: 0,
+            }}
+            wrapperStyle={{ padding: 0 }}
+          >            
 
             <Divider style={{ marginBottom: 16, backgroundColor: '#e1e1e1', height: 1 }} />
             
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              <View style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={{ fontSize: 16, marginBottom: 0, fontWeight: '500', color: '#333' }}>Steep Time</Text>
-                  <Text style={{ fontSize: 16, color: '#2089dc', fontWeight: '600' }}>{formatTime(timerActive ? timerSeconds : steepTimeSeconds)}</Text>
+            <View className="px-4 pb-2">
+              <View className="mb-4">
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="text-base font-medium text-gray-800">Steep Time</Text>
+                  <Text className="text-base font-semibold text-blue-600">
+                    {formatTime(timerActive ? timerSeconds : steepTimeSeconds)}
+                  </Text>
                 </View>
                 <Slider
                   value={steepTimeSeconds}
@@ -557,63 +443,60 @@ const HomeScreenComponent = () => {
                 />
               </View>
 
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, marginBottom: 0, fontWeight: '500', color: '#333' }}>Use Bloom?</Text>
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-base font-medium text-gray-800">Use Bloom?</Text>
                 <Switch
                   value={useBloom}
-                  onValueChange={(v) => { setUseBloom(v); setIsDropdownFocus(false); }}
+                  onValueChange={setUseBloom}
                   color="#2089dc"
                 />
               </View>
 
               {useBloom && (
-                <View style={{ marginBottom: 16, marginTop: 12 }}>
-                  <Text style={{ fontSize: 16, marginBottom: 8, fontWeight: '500', color: '#333' }}>Bloom Time (e.g., 0:30)</Text>
+                <View className="mb-4">
+                  <Text className="text-base font-medium text-gray-800 mb-2">Bloom Time (e.g., 0:30)</Text>
                   <Input
                     value={bloomTime}
                     onChangeText={setBloomTime}
                     placeholder="Minutes:Seconds"
                     placeholderTextColor="#9CA3AF"
                     keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
-                    onFocus={() => setIsDropdownFocus(false)}
                     inputContainerStyle={{ borderWidth: 1, borderColor: '#e1e1e1', borderRadius: 8, paddingHorizontal: 10 }}
                   />
                 </View>
               )}
 
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, marginBottom: 8, fontWeight: '500', color: '#333' }}>Grind Size</Text>
+              <View className="mb-4">
+                <Text className="text-base font-medium text-gray-800 mb-2">Grind Size</Text>
                 <Input
                   value={grindSize}
                   onChangeText={setGrindSize}
                   placeholder="Medium-Fine, 18 clicks, etc."
                   placeholderTextColor="#9CA3AF"
-                  onFocus={() => setIsDropdownFocus(false)}
                   inputContainerStyle={{ borderWidth: 1, borderColor: '#e1e1e1', borderRadius: 8, paddingHorizontal: 10 }}
                 />
               </View>
 
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, marginBottom: 8, fontWeight: '500', color: '#333' }}>Water Temperature</Text>
+              <View className="mb-4">
+                <Text className="text-base font-medium text-gray-800 mb-2">Water Temperature</Text>
                 <Input
                   value={waterTemp}
                   onChangeText={setWaterTemp}
                   placeholder="Temperature in °C or °F"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="numeric"
-                  onFocus={() => setIsDropdownFocus(false)}
                   inputContainerStyle={{ borderWidth: 1, borderColor: '#e1e1e1', borderRadius: 8, paddingHorizontal: 10 }}
                 />
               </View>
             </View>
 
-            <Divider style={{ marginBottom: 16, backgroundColor: '#e1e1e1', height: 1 }} />
+            <Divider style={{ marginVertical: 16, backgroundColor: '#e1e1e1', height: 1 }} />
             
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              <View style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={{ fontSize: 16, marginBottom: 0, fontWeight: '500', color: '#333' }}>Rating</Text>
-                  <Text style={{ fontSize: 16, color: '#2089dc', fontWeight: '600' }}>{rating}/10</Text>
+            <View className="px-4 pb-2">
+              <View className="mb-4">
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="text-base font-medium text-gray-800">Rating</Text>
+                  <Text className="text-base font-semibold text-blue-600">{rating}/10</Text>
                 </View>
                 <Slider
                   value={rating}
@@ -630,8 +513,8 @@ const HomeScreenComponent = () => {
                 />
               </View>
 
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, marginBottom: 8, fontWeight: '500', color: '#333' }}>Notes</Text>
+              <View className="mb-4">
+                <Text className="text-base font-medium text-gray-800 mb-2">Notes</Text>
                 <Input
                   value={notes}
                   onChangeText={setNotes}
@@ -644,255 +527,145 @@ const HomeScreenComponent = () => {
                     borderColor: '#e1e1e1', 
                     borderRadius: 8, 
                     paddingHorizontal: 10,
-                    minHeight: 120 
+                    minHeight: 100
                   }}
                   inputStyle={{ 
-                    textAlignVertical: 'top', 
-                    paddingTop: 10, 
-                    minHeight: 100 
+                    textAlignVertical: 'top',
+                    paddingTop: Platform.OS === 'ios' ? 10 : 10,
+                    paddingBottom: 10,
+                    minHeight: 80,
                   }}
-                  onFocus={() => setIsDropdownFocus(false)}
                 />
               </View>
             </View>
-
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              <Text style={{ fontSize: 16, marginBottom: 8, fontWeight: '500', color: '#333' }}>Brew Device</Text>
-              <Dropdown
-                style={{
-                  height: 50,
-                  borderColor: '#e1e1e1',
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  paddingHorizontal: 8,
-                  marginBottom: 16,
-                }}
-                placeholderStyle={{ color: '#9e9e9e' }}
-                selectedTextStyle={{ color: '#333' }}
-                data={brewDeviceOptions}
-                maxHeight={300}
-                labelField="label"
-                valueField="value"
-                placeholder="Select brew device"
-                value={selectedBrewDevice}
-                onChange={item => setSelectedBrewDevice(item.value)}
-                disable={brewDeviceOptions.length === 0}
-              />
-              {brewDeviceOptions.length === 0 && (
-                <Text style={{ color: '#9e9e9e', fontSize: 12, marginLeft: 10, marginTop: -12, marginBottom: 16 }}>
-                  Add brew devices in Settings
-                </Text>
-              )}
-            </View>
-
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              <Text style={{ fontSize: 16, marginBottom: 8, fontWeight: '500', color: '#333' }}>Grinder</Text>
-              <Dropdown
-                style={{
-                  height: 50,
-                  borderColor: '#e1e1e1',
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  paddingHorizontal: 8,
-                  marginBottom: 16,
-                }}
-                placeholderStyle={{ color: '#9e9e9e' }}
-                selectedTextStyle={{ color: '#333' }}
-                data={grinderOptions}
-                maxHeight={300}
-                labelField="label"
-                valueField="value"
-                placeholder="Select grinder"
-                value={selectedGrinder}
-                onChange={item => setSelectedGrinder(item.value)}
-                disable={grinderOptions.length === 0}
-              />
-              {grinderOptions.length === 0 && (
-                <Text style={{ color: '#9e9e9e', fontSize: 12, marginLeft: 10, marginTop: -12, marginBottom: 16 }}>
-                  Add grinders in Settings
-                </Text>
-              )}
-            </View>
-
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 16, marginBottom: 0, fontWeight: '500', color: '#333' }}>Timer</Text>
-                <Text style={{ fontSize: 16, color: '#2089dc', fontWeight: '600' }}>{formatTime(timerActive ? timerSeconds : steepTimeSeconds)}</Text>
+            
+            <View className="px-4 pb-2">
+              <View className="mb-4">
+                <Text className="text-base font-medium text-gray-800 mb-2">Brew Device</Text>
+                <Dropdown
+                  style={{
+                    height: 50,
+                    borderColor: '#e1e1e1',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                  }}
+                  placeholderStyle={{ color: '#9e9e9e' }}
+                  selectedTextStyle={{ color: '#333' }}
+                  data={brewDeviceOptions}
+                  maxHeight={300}
+                  labelField="label"
+                  valueField="value"
+                  placeholder="Select brew device"
+                  value={selectedBrewDevice}
+                  onChange={(item: DropdownItem) => setSelectedBrewDevice(item.value)}
+                  disable={brewDeviceOptions.length === 0}
+                />
+                {brewDeviceOptions.length === 0 && (
+                  <Text className="text-xs text-gray-500 ml-2 mt-1">Add brew devices in Settings</Text>
+                )}
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+
+              <View className="mb-4">
+                <Text className="text-base font-medium text-gray-800 mb-2">Grinder</Text>
+                <Dropdown
+                   style={{
+                    height: 50,
+                    borderColor: '#e1e1e1',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                  }}
+                  placeholderStyle={{ color: '#9e9e9e' }}
+                  selectedTextStyle={{ color: '#333' }}
+                  data={grinderOptions}
+                  maxHeight={300}
+                  labelField="label"
+                  valueField="value"
+                  placeholder="Select grinder"
+                  value={selectedGrinder}
+                  onChange={(item: DropdownItem) => setSelectedGrinder(item.value)}
+                  disable={grinderOptions.length === 0}
+                />
+                {grinderOptions.length === 0 && (
+                  <Text className="text-xs text-gray-500 ml-2 mt-1">Add grinders in Settings</Text>
+                )}
+              </View>
+            </View>
+
+            <View className="px-4 pb-2">
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-base font-medium text-gray-800">Timer</Text>
+                <Text className="text-base font-semibold text-blue-600">
+                  {formatTime(timerActive ? timerSeconds : steepTimeSeconds)}
+                </Text>
+              </View>
+              <View className="flex-row justify-around items-center mt-2">
                 <RNEButton
                   title={timerActive ? "Stop" : "Start"}
                   onPress={timerActive ? stopTimer : startTimer}
-                  buttonStyle={{ marginHorizontal: 8, borderRadius: 8, paddingHorizontal: 16 }}
+                  buttonStyle={{ borderRadius: 8, paddingHorizontal: 16 }}
+                  containerStyle={{ flex: 1, marginRight: 4 }}
                 />
                 <RNEButton
                   title="Reset"
                   onPress={resetTimer}
-                  buttonStyle={{ marginHorizontal: 8, borderRadius: 8, paddingHorizontal: 16 }}
+                  buttonStyle={{ borderRadius: 8, paddingHorizontal: 16 }}
+                  containerStyle={{ flex: 1, marginLeft: 4 }}
                   color="#607d8b"
                 />
               </View>
             </View>
 
-            <Divider style={{ marginBottom: 16, backgroundColor: '#e1e1e1', height: 1 }} />
+            <Divider style={{ marginVertical: 16, backgroundColor: '#e1e1e1', height: 1 }} />
             
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+            <View className="px-4 pb-2">
               <RNEButton
                 title="Get AI Suggestions"
                 onPress={getAiSuggestions}
-                buttonStyle={[styles.actionButton, { backgroundColor: '#5e35b1' }]}
+                buttonStyle={{ height: 48, borderRadius: 8, backgroundColor: '#5e35b1' }}
                 loading={gettingSuggestion}
-                icon={{
-                  name: 'lightbulb-outline',
-                  type: 'material',
-                  color: 'white',
-                  size: 18
-                }}
+                icon={{ name: 'lightbulb-outline', type: 'material', color: 'white', size: 18 }}
               />
             </View>
 
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              {showSuggestion && (
-                <Card containerStyle={styles.suggestionCard}>
-                  <Text style={styles.suggestionTitle}>AI Suggestions</Text>
+            {showSuggestion && (
+              <View className="px-4 pb-2">
+                <Card containerStyle={{ borderRadius: 8, padding: 16, backgroundColor: '#f9f4ff', marginTop: 8, marginHorizontal: 0 }}>
+                  <Text className="text-lg font-semibold mb-3 text-purple-700">AI Suggestions</Text>
                   {gettingSuggestion ? (
-                    <ActivityIndicator size="large" color="#5e35b1" style={styles.suggestionLoader} />
+                    <ActivityIndicator size="large" color="#5e35b1" style={{ marginVertical: 20 }} />
                   ) : (
-                    <Text style={styles.suggestionText}>
+                    <Text className="text-sm leading-5 text-gray-800">
                       {suggestion || 'No suggestions available. Please check your OpenAI API key in settings.'}
                     </Text>
                   )}
                   <RNEButton
                     title="Hide Suggestions"
                     onPress={() => setShowSuggestion(false)}
-                    buttonStyle={styles.hideButton}
+                    buttonStyle={{ marginTop: 12 }}
                     type="clear"
+                    titleStyle={{ color: '#5e35b1' }}
                   />
                 </Card>
-              )}
+              </View>
+            )}
+
+            <View className="px-4 pt-4 pb-4">
+              <RNEButton
+                title="Save Brew"
+                onPress={handleSaveBrew}
+                buttonStyle={{ backgroundColor: '#2089dc', borderRadius: 8, height: 50 }}
+                raised
+                disabled={!beanName}
+              />
             </View>
 
-            <RNEButton
-              title="Save Brew"
-              onPress={handleSaveBrew}
-              containerStyle={{ marginHorizontal: 16, marginTop: 16 }}
-              buttonStyle={{ backgroundColor: '#2089dc', borderRadius: 8, height: 50 }}
-              raised
-            />
           </Card>
         </ScrollView>
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 10,
-    marginHorizontal: 12,
-    marginVertical: 16,
-    padding: 16
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 20,
-    textAlign: 'center'
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 8,
-    marginLeft: 10
-  },
-  inputContainer: {
-    marginBottom: 12
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16
-  },
-  timerButton: {
-    marginHorizontal: 8,
-    borderRadius: 8,
-    paddingHorizontal: 16
-  },
-  sliderTrack: {
-    height: 6,
-    borderRadius: 3
-  },
-  sliderThumb: {
-    height: 20,
-    width: 20,
-    backgroundColor: '#2089dc'
-  },
-  rowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: 8,
-    paddingHorizontal: 10
-  },
-  labelWithSwitch: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#666'
-  },
-  actionButton: {
-    height: 48,
-    borderRadius: 8
-  },
-  divider: {
-    marginVertical: 16
-  },
-  dropdown: {
-    height: 50,
-    borderColor: '#e1e1e1',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    marginHorizontal: 10
-  },
-  dropdownPlaceholder: {
-    color: '#9e9e9e'
-  },
-  dropdownSelectedText: {
-    color: '#333'
-  },
-  helperText: {
-    color: '#9e9e9e',
-    fontSize: 12,
-    marginLeft: 10,
-    marginTop: -12,
-    marginBottom: 16
-  },
-  suggestionCard: {
-    marginTop: 16,
-    marginBottom: 8,
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: '#f9f4ff'
-  },
-  suggestionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#5e35b1'
-  },
-  suggestionText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#333'
-  },
-  suggestionLoader: {
-    marginVertical: 20
-  },
-  hideButton: {
-    marginTop: 12
-  }
-});
 
 export default HomeScreenComponent;

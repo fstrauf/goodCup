@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, Alert, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Modal } from 'react-native';
+import { View, ScrollView, Alert, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Button, Card, Text, Input, Divider, Icon } from '@rneui/themed';
 import * as ImagePicker from 'expo-image-picker';
 import { getApiKey, getBrewSuggestions, analyzeImage, createOpenAIClient } from '../../lib/openai';
+import { Dropdown } from 'react-native-element-dropdown';
 
 // Storage keys
 const BEANS_STORAGE_KEY = '@GoodCup:beans';
@@ -16,9 +17,6 @@ const BEAN_NAMES_STORAGE_KEY = '@GoodCup:beanNames';
 interface Bean {
   id: string;
   name: string;
-  roaster: string;
-  origin: string;
-  process: string;
   roastLevel: string;
   flavorNotes: string[];
   description: string;
@@ -42,7 +40,16 @@ interface Brew {
   grinder?: string;
 }
 
+// Roast Level Options for Dropdown
+const roastLevelOptions = [
+  { label: 'Light', value: 'light' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'Dark', value: 'dark' },
+  { label: 'Unknown', value: 'unknown' },
+];
+
 export default function BeansScreen() {
+  const router = useRouter();
   const [beans, setBeans] = useState<Bean[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -51,9 +58,6 @@ export default function BeansScreen() {
   // New bean form state
   const [newBean, setNewBean] = useState<Partial<Bean>>({
     name: '',
-    roaster: '',
-    origin: '',
-    process: '',
     roastLevel: '',
     flavorNotes: [],
     description: '',
@@ -94,19 +98,16 @@ export default function BeansScreen() {
             const highestRatedBrew = relatedBrews.sort((a, b) => b.rating - a.rating)[0];
             
             // Create a basic bean entry
-            const newBean: Bean = {
+            const newBeanEntry: Bean = {
               id: `brew-bean-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               name: beanName,
-              roaster: 'Unknown',
-              origin: 'Unknown',
-              process: 'Unknown',
-              roastLevel: 'Unknown',
+              roastLevel: 'unknown',
               flavorNotes: [],
               description: highestRatedBrew?.notes || '',
               timestamp: highestRatedBrew?.timestamp || Date.now()
             };
             
-            beansArray.push(newBean);
+            beansArray.push(newBeanEntry);
           }
         }
         
@@ -146,8 +147,8 @@ export default function BeansScreen() {
   
   // Add a new bean
   const addBean = async () => {
-    if (!newBean.name || !newBean.roaster) {
-      Alert.alert('Missing Information', 'Please enter at least a name and roaster.');
+    if (!newBean.name) {
+      Alert.alert('Missing Information', 'Please enter at least a name.');
       return;
     }
     
@@ -157,10 +158,7 @@ export default function BeansScreen() {
       const beanToAdd: Bean = {
         id: Date.now().toString(),
         name: newBean.name,
-        roaster: newBean.roaster,
-        origin: newBean.origin || 'Unknown',
-        process: newBean.process || 'Unknown',
-        roastLevel: newBean.roastLevel || 'Medium',
+        roastLevel: newBean.roastLevel || 'unknown',
         flavorNotes: newBean.flavorNotes || [],
         description: newBean.description || '',
         photo: newBean.photo,
@@ -173,9 +171,6 @@ export default function BeansScreen() {
       // Reset form
       setNewBean({
         name: '',
-        roaster: '',
-        origin: '',
-        process: '',
         roastLevel: '',
         flavorNotes: [],
         description: '',
@@ -291,13 +286,12 @@ export default function BeansScreen() {
       const extractedData = await analyzeImage(base64Image);
       
       // Update form with extracted data
+      const validRoastLevel = roastLevelOptions.find(o => o.label.toLowerCase() === extractedData.roastLevel?.toLowerCase())?.value;
+
       setNewBean(prev => ({
         ...prev,
         name: extractedData.name || prev.name,
-        roaster: extractedData.roaster || prev.roaster,
-        origin: extractedData.origin || prev.origin,
-        process: extractedData.process || prev.process,
-        roastLevel: extractedData.roastLevel || prev.roastLevel,
+        roastLevel: validRoastLevel || prev.roastLevel || 'unknown',
         flavorNotes: extractedData.flavorNotes || prev.flavorNotes,
         description: extractedData.description || prev.description
       }));
@@ -376,9 +370,7 @@ export default function BeansScreen() {
         messages: [
           {
             role: 'user',
-            content: `I have a coffee bean called "${bean.name}" from roaster "${bean.roaster}". 
-Origin: ${bean.origin}
-Process: ${bean.process}
+            content: `I have a coffee bean called "${bean.name}". 
 Roast Level: ${bean.roastLevel}
 Flavor Notes: ${bean.flavorNotes.join(', ')}
 Description: ${bean.description}
@@ -389,8 +381,8 @@ ${suggestion}
 ---
 
 Please provide a comprehensive analysis of:
-1. The optimal brewing parameters specifically for this bean type, origin, and process
-2. How the roast level affects the extraction and what to adjust
+1. The optimal brewing parameters specifically for this bean type
+2. How the roast level (${bean.roastLevel}) affects the extraction and what to adjust
 3. What brewing method would best highlight the flavor notes
 4. Temperature and grind size recommendations based on the bean characteristics
 5. A concise model predictive control approach to adjust parameters if the brew is under or over-extracted
@@ -417,228 +409,248 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
   };
   
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-      <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
-        <Card containerStyle={styles.headerCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={styles.title}>Coffee Beans</Text>
-            <Button
-              icon={{ name: 'add', color: 'white', size: 22 }}
-              title={showAddForm ? "Cancel" : "Add Bean"}
-              onPress={() => setShowAddForm(!showAddForm)}
-              buttonStyle={{ ...styles.actionButton, backgroundColor: showAddForm ? '#f44336' : '#2196f3' }}
-            />
-          </View>
-        </Card>
-        
-        {showAddForm ? (
-          <Card containerStyle={styles.formCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.formTitle}>Add New Bean</Text>
-              
-              <View style={styles.photoContainer}>
-                {newBean.photo ? (
-                  <Image source={{ uri: newBean.photo }} style={styles.beanPhoto} />
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Icon name="image" type="material" size={40} color="#bdbdbd" />
-                    <Text style={{ color: '#757575', marginTop: 8 }}>No Photo</Text>
-                  </View>
-                )}
-                
-                <View style={styles.photoButtons}>
-                  <Button
-                    title="Camera"
-                    icon={{ name: 'camera-alt', type: 'material', color: 'white', size: 16 }}
-                    onPress={takePhoto}
-                    buttonStyle={styles.photoButton}
-                  />
-                  <Button
-                    title="Gallery"
-                    icon={{ name: 'photo-library', type: 'material', color: 'white', size: 16 }}
-                    onPress={pickImage}
-                    buttonStyle={styles.photoButton}
-                  />
-                </View>
-                
-                {analyzing && (
-                  <View style={styles.analyzerOverlay}>
-                    <ActivityIndicator size="large" color="#2196f3" />
-                    <Text style={{ marginTop: 12, color: 'white', fontWeight: '500' }}>
-                      Analyzing photo...
-                    </Text>
-                  </View>
-                )}
-              </View>
-              
-              <Divider style={styles.divider} />
-              
-              <Input
-                label="Bean Name"
-                value={newBean.name}
-                onChangeText={(text) => setNewBean({ ...newBean, name: text })}
-                placeholder="e.g., Ethiopia Yirgacheffe"
-                containerStyle={styles.input}
-              />
-              
-              <Input
-                label="Roaster"
-                value={newBean.roaster}
-                onChangeText={(text) => setNewBean({ ...newBean, roaster: text })}
-                placeholder="e.g., Stumptown Coffee"
-                containerStyle={styles.input}
-              />
-              
-              <Input
-                label="Origin"
-                value={newBean.origin}
-                onChangeText={(text) => setNewBean({ ...newBean, origin: text })}
-                placeholder="e.g., Ethiopia, Yirgacheffe region"
-                containerStyle={styles.input}
-              />
-              
-              <Input
-                label="Process"
-                value={newBean.process}
-                onChangeText={(text) => setNewBean({ ...newBean, process: text })}
-                placeholder="e.g., Washed, Natural, Honey"
-                containerStyle={styles.input}
-              />
-              
-              <Input
-                label="Roast Level"
-                value={newBean.roastLevel}
-                onChangeText={(text) => setNewBean({ ...newBean, roastLevel: text })}
-                placeholder="e.g., Light, Medium, Dark"
-                containerStyle={styles.input}
-              />
-              
-              <Input
-                label="Flavor Notes (comma separated)"
-                value={newBean.flavorNotes?.join(', ')}
-                onChangeText={(text) => setNewBean({ ...newBean, flavorNotes: text.split(',').map(note => note.trim()).filter(note => note) })}
-                placeholder="e.g., Blueberry, Chocolate, Citrus"
-                containerStyle={styles.input}
-              />
-              
-              <Input
-                label="Description"
-                value={newBean.description}
-                onChangeText={(text) => setNewBean({ ...newBean, description: text })}
-                placeholder="Add notes about this coffee"
-                multiline
-                numberOfLines={4}
-                containerStyle={styles.input}
-              />
-              
+    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      >
+        <View className="flex-1 bg-white dark:bg-black">
+          <Card containerStyle={{ marginHorizontal: 12, marginTop: 12, marginBottom: 8, borderRadius: 10, padding: 16, backgroundColor: 'white' }}>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-2xl font-semibold text-gray-800">Coffee Beans</Text>
               <Button
-                title="Save Bean"
-                onPress={addBean}
-                loading={loading}
-                buttonStyle={styles.saveButton}
-                containerStyle={{ marginBottom: 20 }}
+                icon={{ name: 'add', color: 'white', size: 22 }}
+                title={showAddForm ? "Cancel" : "Add Bean"}
+                onPress={() => setShowAddForm(!showAddForm)}
+                buttonStyle={{ borderRadius: 8, paddingHorizontal: 12, backgroundColor: showAddForm ? '#f44336' : '#2196f3' }}
               />
-            </ScrollView>
+            </View>
           </Card>
-        ) : (
-          <ScrollView style={{ flex: 1 }}>
-            {beans.length === 0 ? (
-              <Card containerStyle={styles.emptyCard}>
-                <Text style={styles.emptyText}>No beans added yet</Text>
-                <Text style={styles.emptySubtext}>
-                  Add your first coffee bean by taking a photo of the package
-                </Text>
-              </Card>
-            ) : (
-              beans.map((bean) => (
-                <Card key={bean.id} containerStyle={styles.beanCard}>
-                  <View style={{ flexDirection: 'row' }}>
-                    {bean.photo ? (
-                      <Image source={{ uri: bean.photo }} style={styles.cardPhoto} />
+          
+          {showAddForm ? (
+            <View className="flex-1">
+              <ScrollView
+                className="px-3"
+                contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View className="bg-white p-4 rounded-lg mb-4">
+                  <Text className="text-xl font-semibold mb-4 text-center text-gray-800">Add New Bean</Text>
+                  
+                  <View className="relative items-center mb-4">
+                    {newBean.photo ? (
+                      <Image source={{ uri: newBean.photo }} className="w-full h-48 rounded-lg mb-2" />
                     ) : (
-                      <View style={styles.cardPhotoPlaceholder}>
-                        <Icon name="coffee" type="material" size={24} color="#bdbdbd" />
+                      <View className="w-full h-48 rounded-lg bg-gray-200 justify-center items-center mb-2">
+                        <Icon name="image" type="material" size={40} color="#bdbdbd" />
+                        <Text className="text-gray-500 mt-2">No Photo</Text>
                       </View>
                     )}
                     
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={styles.beanName}>{bean.name}</Text>
-                        <TouchableOpacity onPress={() => deleteBean(bean.id)}>
-                          <Icon name="delete" type="material" size={20} color="#f44336" />
-                        </TouchableOpacity>
+                    <View className="flex-row justify-center mt-2">
+                      <Button
+                        title="Camera"
+                        icon={{ name: 'camera-alt', type: 'material', color: 'white', size: 16 }}
+                        onPress={takePhoto}
+                        buttonStyle={{ marginHorizontal: 8, borderRadius: 8, paddingHorizontal: 16, backgroundColor: '#607d8b' }}
+                        titleStyle={{ fontSize: 14 }}
+                      />
+                      <Button
+                        title="Gallery"
+                        icon={{ name: 'photo-library', type: 'material', color: 'white', size: 16 }}
+                        onPress={pickImage}
+                        buttonStyle={{ marginHorizontal: 8, borderRadius: 8, paddingHorizontal: 16, backgroundColor: '#607d8b' }}
+                        titleStyle={{ fontSize: 14 }}
+                      />
+                    </View>
+                    
+                    {analyzing && (
+                      <View className="absolute top-0 left-0 right-0 bottom-0 bg-black/70 rounded-lg justify-center items-center">
+                        <ActivityIndicator size="large" color="#2196f3" />
+                        <Text className="mt-3 text-white font-medium">Analyzing photo...</Text>
                       </View>
+                    )}
+                  </View>
+                  
+                  <Divider style={{ marginVertical: 16 }} />
+                  
+                  <Input
+                    label="Bean Name"
+                    value={newBean.name}
+                    onChangeText={(text: string) => setNewBean({ ...newBean, name: text })}
+                    placeholder="e.g., Ethiopia Yirgacheffe"
+                    containerStyle={{ marginBottom: 8 }}
+                    labelStyle={styles.inputLabel}
+                  />
+                  
+                  <Text style={styles.inputLabel}>Roast Level</Text>
+                  <Dropdown
+                    style={styles.dropdown}
+                    placeholderStyle={styles.placeholderStyle}
+                    selectedTextStyle={styles.selectedTextStyle}
+                    inputSearchStyle={styles.inputSearchStyle}
+                    iconStyle={styles.iconStyle}
+                    data={roastLevelOptions}
+                    maxHeight={300}
+                    labelField="label"
+                    valueField="value"
+                    placeholder="Select roast level"
+                    searchPlaceholder="Search..."
+                    value={newBean.roastLevel}
+                    onChange={item => {
+                      setNewBean({ ...newBean, roastLevel: item.value });
+                    }}
+                  />
+                  
+                  <Input
+                    label="Flavor Notes (comma separated)"
+                    value={newBean.flavorNotes?.join(', ')}
+                    onChangeText={(text: string) => setNewBean({ ...newBean, flavorNotes: text.split(',').map((note: string) => note.trim()).filter((note: string) => note) })}
+                    placeholder="e.g., Blueberry, Chocolate, Citrus"
+                    containerStyle={{ marginTop: 8, marginBottom: 8 }}
+                    labelStyle={styles.inputLabel}
+                  />
+                  
+                  <Input
+                    label="Description"
+                    value={newBean.description}
+                    onChangeText={(text: string) => setNewBean({ ...newBean, description: text })}
+                    placeholder="Additional notes about this coffee"
+                    multiline
+                    numberOfLines={3}
+                    containerStyle={{ marginBottom: 8 }}
+                    labelStyle={styles.inputLabel}
+                  />
+                </View>
+              </ScrollView>
+              
+              <View className="absolute bottom-0 left-0 right-0 bg-white py-2.5 px-4 border-t border-gray-200 z-50 shadow-lg">
+                <Button
+                  title="Save Bean"
+                  onPress={addBean}
+                  loading={loading}
+                  buttonStyle={{ backgroundColor: '#43a047', height: 48, borderRadius: 8 }}
+                  containerStyle={{ width: '100%' }}
+                />
+              </View>
+            </View>
+          ) : (
+            <ScrollView className="flex-1">
+              {beans.length === 0 ? (
+                <Card containerStyle={{ marginHorizontal: 12, marginVertical: 16, borderRadius: 10, padding: 24, alignItems: 'center', backgroundColor: 'white' }}>
+                  <Text className="text-lg font-semibold text-gray-800 mb-2">No beans added yet</Text>
+                  <Text className="text-sm text-gray-500 text-center">
+                    Add your first coffee bean by taking a photo of the package
+                  </Text>
+                </Card>
+              ) : (
+                beans.map((bean) => (
+                  <Card key={bean.id} containerStyle={{ marginHorizontal: 12, marginBottom: 12, borderRadius: 10, padding: 16, backgroundColor: 'white' }}>
+                    <View className="flex-row">
+                      {bean.photo ? (
+                        <Image source={{ uri: bean.photo }} className="w-20 h-20 rounded-lg" />
+                      ) : (
+                        <View className="w-20 h-20 rounded-lg bg-gray-200 justify-center items-center">
+                          <Icon name="coffee" type="material" size={24} color="#bdbdbd" />
+                        </View>
+                      )}
                       
-                      <Text style={styles.roasterName}>{bean.roaster}</Text>
-                      <Divider style={{ marginVertical: 8 }} />
-                      
-                      <View style={styles.beanInfo}>
-                        <Text style={styles.beanDetail}>Origin: {bean.origin}</Text>
-                        <Text style={styles.beanDetail}>Process: {bean.process}</Text>
-                        <Text style={styles.beanDetail}>Roast: {bean.roastLevel}</Text>
+                      <View className="flex-1 ml-3">
+                        <View className="flex-row justify-between">
+                          <Text className="text-lg font-semibold text-gray-800">{bean.name}</Text>
+                          <TouchableOpacity onPress={() => deleteBean(bean.id)}>
+                            <Icon name="delete" type="material" size={20} color="#f44336" />
+                          </TouchableOpacity>
+                        </View>
                         
-                        {bean.flavorNotes && bean.flavorNotes.length > 0 && (
-                          <View style={{ marginTop: 4 }}>
-                            <Text style={styles.beanDetail}>Flavor Notes:</Text>
-                            <View style={styles.flavorTags}>
-                              {bean.flavorNotes.map((note, index) => (
-                                <View key={index} style={styles.flavorTag}>
-                                  <Text style={styles.flavorTagText}>{note.trim()}</Text>
-                                </View>
-                              ))}
+                        <Divider style={{ marginVertical: 8 }} />
+                        
+                        <View className="flex-1">
+                          <Text className="text-sm text-gray-700 mb-0.5">
+                            Roast: {roastLevelOptions.find(o => o.value === bean.roastLevel)?.label || bean.roastLevel || 'Unknown'}
+                          </Text>
+                          
+                          {bean.flavorNotes && bean.flavorNotes.length > 0 && (
+                            <View className="mt-1">
+                              <Text className="text-sm text-gray-700">Flavor Notes:</Text>
+                              <View className="flex-row flex-wrap mt-1 mb-2">
+                                {bean.flavorNotes.map((note: string, index: number) => (
+                                  <View key={index} className="bg-blue-100 px-2 py-0.5 rounded-full mr-1.5 mb-1.5">
+                                    <Text className="text-xs text-blue-700">{note.trim()}</Text>
+                                  </View>
+                                ))}
+                              </View>
                             </View>
+                          )}
+                          
+                          {bean.description && (
+                            <Text className="text-sm text-gray-700 mt-2 italic">{bean.description}</Text>
+                          )}
+                          
+                          <Text className="text-xs text-gray-400 mt-2 text-right">Added: {formatDate(bean.timestamp)}</Text>
+
+                          <View className="flex-row justify-around mt-4 pt-3 border-t border-gray-100">
+                            <TouchableOpacity 
+                              className="flex-1 items-center px-1 py-1" 
+                              onPress={() => router.push({ pathname: '/', params: { beanName: bean.name } })}
+                            >
+                              <Icon name="local-cafe" type="material" size={20} color="#607d8b" />
+                              <Text className="text-xs text-center text-[#607d8b] mt-1">Brew</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                              className="flex-1 items-center px-1 py-1 border-l border-r border-gray-100" 
+                              onPress={() => router.push({ pathname: '/brews', params: { beanName: bean.name } })}
+                            >
+                              <Icon name="history" type="material" size={20} color="#607d8b" />
+                              <Text className="text-xs text-center text-[#607d8b] mt-1">Review</Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity 
+                              className="flex-1 items-center px-1 py-1" 
+                              onPress={() => getOptimalBrewSuggestions(bean)}
+                            >
+                              <Icon name="science" type="material" size={20} color="#5e35b1" />
+                              <Text className="text-xs text-center text-[#5e35b1] mt-1">Suggest</Text>
+                            </TouchableOpacity>
                           </View>
-                        )}
-                        
-                        {bean.description && (
-                          <Text style={styles.description}>{bean.description}</Text>
-                        )}
-                        
-                        <Text style={styles.timestamp}>Added: {formatDate(bean.timestamp)}</Text>
-                        
-                        {/* Add Optimal Brew button */}
-                        <Button
-                          title="Get Optimal Brew"
-                          icon={{ name: 'science', type: 'material', color: 'white', size: 16 }}
-                          onPress={() => getOptimalBrewSuggestions(bean)}
-                          buttonStyle={styles.optimalBrewButton}
-                          titleStyle={{ fontSize: 14 }}
-                        />
+                        </View>
                       </View>
                     </View>
-                  </View>
-                </Card>
-              ))
-            )}
-          </ScrollView>
-        )}
-      </View>
+                  </Card>
+                ))
+              )}
+            </ScrollView>
+          )}
+        </View>
+      </KeyboardAvoidingView>
       
-      {/* Suggestion Modal */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={suggestionModalVisible}
         onRequestClose={() => setSuggestionModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
+        <View className="flex-1 justify-center items-center bg-black/50">
+          <View className="w-[90%] bg-white rounded-2xl p-5 max-h-[80%] shadow-lg">
+            <Text className="text-xl font-semibold text-center text-gray-800">
               {selectedBeanForSuggestion?.name || 'Bean'} Optimal Brew
             </Text>
             
             <Divider style={{ marginVertical: 12 }} />
             
-            <ScrollView style={styles.suggestionScrollView}>
+            <ScrollView style={{ maxHeight: 400 }}>
               {gettingSuggestion ? (
-                <View style={styles.loadingContainer}>
+                <View className="items-center justify-center py-8">
                   <ActivityIndicator size="large" color="#2196f3" />
-                  <Text style={{ marginTop: 12, color: '#666' }}>
+                  <Text className="mt-3 text-gray-500">
                     Analyzing brewing data...
                   </Text>
                 </View>
               ) : (
-                <Text style={styles.suggestionText}>
+                <Text className="text-base leading-relaxed text-gray-800">
                   {beanSuggestion || 'No suggestions available.'}
                 </Text>
               )}
@@ -656,213 +668,40 @@ Respond with specific, actionable brewing advice to get the best flavor from thi
   );
 }
 
+// Add styles for Dropdown and consistent Input Label
 const styles = StyleSheet.create({
-  headerCard: {
-    marginHorizontal: 12,
-    marginTop: 12,
+  inputLabel: {
+    fontSize: 16,
+    color: '#86939e',
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  dropdown: {
+    height: 50,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 10,
     marginBottom: 8,
-    borderRadius: 10,
-    padding: 16
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#333'
-  },
-  actionButton: {
-    borderRadius: 8,
-    paddingHorizontal: 12
-  },
-  formCard: {
-    marginHorizontal: 12,
-    marginBottom: 16,
-    borderRadius: 10,
-    padding: 16
-  },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#333'
-  },
-  input: {
-    marginBottom: 8
-  },
-  photoContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  beanPhoto: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 8
-  },
-  photoPlaceholder: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  photoButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center'
-  },
-  photoButton: {
-    marginHorizontal: 8,
-    borderRadius: 8,
-    paddingHorizontal: 16
-  },
-  analyzerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  divider: {
-    marginVertical: 16
-  },
-  saveButton: {
-    backgroundColor: '#43a047',
-    height: 48,
-    borderRadius: 8
-  },
-  emptyCard: {
-    marginHorizontal: 12,
-    marginVertical: 16,
-    borderRadius: 10,
-    padding: 24,
-    alignItems: 'center'
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#757575',
-    textAlign: 'center'
-  },
-  beanCard: {
-    marginHorizontal: 12,
-    marginBottom: 12,
-    borderRadius: 10,
-    padding: 16
-  },
-  cardPhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 8
-  },
-  cardPhotoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  beanName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333'
-  },
-  roasterName: {
-    fontSize: 14,
-    color: '#757575',
-    marginTop: 2
-  },
-  beanInfo: {
-    flex: 1
-  },
-  beanDetail: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 2
-  },
-  flavorTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 4,
-    marginBottom: 8
-  },
-  flavorTag: {
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 6
-  },
-  flavorTagText: {
-    fontSize: 12,
-    color: '#1976d2'
-  },
-  description: {
-    fontSize: 14,
-    color: '#555',
-    marginTop: 8,
-    fontStyle: 'italic'
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#9e9e9e',
-    marginTop: 8,
-    textAlign: 'right'
-  },
-  optimalBrewButton: {
-    marginTop: 12,
-    backgroundColor: '#5e35b1',
-    borderRadius: 8,
-    height: 36,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    width: '90%',
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    maxHeight: '80%',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    textAlign: 'center',
-    color: '#333',
+  placeholderStyle: {
+    fontSize: 16,
+    color: '#adb5bd',
   },
-  suggestionScrollView: {
-    maxHeight: 400,
+  selectedTextStyle: {
+    fontSize: 16,
+    color: 'black',
   },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 30,
+  iconStyle: {
+    width: 20,
+    height: 20,
   },
-  suggestionText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#333',
+  inputSearchStyle: {
+    height: 40,
+    fontSize: 16,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
   },
 }); 

@@ -1,20 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { FlatList, View, RefreshControl, TouchableOpacity, Modal, ActivityIndicator, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams, Stack, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Text, Divider, Button } from '@rneui/themed';
-import { Dropdown } from 'react-native-element-dropdown';
 import { getBrewSuggestions, Brew } from '../../lib/openai';
 
 // Storage keys
 const BREWS_STORAGE_KEY = '@GoodCup:brews';
-
-// Interfaces
-interface BeanOption {
-  label: string;
-  value: string;
-}
 
 // Helper function to format seconds into MM:SS (same as in HomeScreen)
 const formatTime = (totalSeconds: number): string => {
@@ -35,10 +28,12 @@ const formatDate = (timestamp: number): string => {
 };
 
 export default function BrewsScreen() {
-  const [brews, setBrews] = useState<Brew[]>([]);
+  const params = useLocalSearchParams<{ beanName?: string }>();
+  const beanNameFilter = params.beanName;
+  const navigation = useNavigation();
+
+  const [allBrews, setAllBrews] = useState<Brew[]>([]);
   const [filteredBrews, setFilteredBrews] = useState<Brew[]>([]);
-  const [beanOptions, setBeanOptions] = useState<BeanOption[]>([]);
-  const [selectedBean, setSelectedBean] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   
@@ -48,60 +43,48 @@ export default function BrewsScreen() {
   const [suggestion, setSuggestion] = useState<string>('');
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
+  // Effect to update header title
+  useEffect(() => {
+    if (beanNameFilter) {
+      navigation.setOptions({ title: beanNameFilter });
+    }
+  }, [beanNameFilter, navigation]);
+
+  // Simplified filter function
+  const applyFilter = useCallback((brewsToFilter: Brew[]) => {
+    console.log("[ApplyFilter] Filtering for bean:", beanNameFilter);
+    let result = brewsToFilter;
+    if (beanNameFilter) {
+      result = result.filter(brew => brew.beanName === beanNameFilter);
+    }
+    result.sort((a, b) => b.timestamp - a.timestamp);
+    setFilteredBrews(result);
+  }, [beanNameFilter]);
+
   const loadBrews = useCallback(async () => {
     setRefreshing(true);
     try {
       const storedBrews = await AsyncStorage.getItem(BREWS_STORAGE_KEY);
       if (storedBrews !== null) {
         const parsedBrews: Brew[] = JSON.parse(storedBrews);
+        const fixedBrews = parsedBrews.map(brew => ({ ...brew, beanName: brew.beanName || 'Unnamed Bean' }));
         
-        // Fix any null or undefined bean names
-        const fixedBrews = parsedBrews.map(brew => ({
-          ...brew,
-          beanName: brew.beanName || 'Unnamed Bean'
-        }));
-        
-        // Extract unique bean names for filter dropdown
-        const uniqueBeans = Array.from(new Set(fixedBrews.map(brew => brew.beanName)));
-        const options = uniqueBeans.map(bean => ({ label: bean, value: bean }));
-        
-        setBeanOptions([{ label: 'All Beans', value: 'all' }, ...options]);
-        setBrews(fixedBrews);
-        applyFilters(fixedBrews, selectedBean);
+        setAllBrews(fixedBrews);
+
+        console.log("[LoadBrews] Applying filter for:", beanNameFilter);
+        applyFilter(fixedBrews);
       } else {
-        setBrews([]);
+        setAllBrews([]);
         setFilteredBrews([]);
-        setBeanOptions([{ label: 'All Beans', value: 'all' }]);
       }
     } catch (e) {
       console.error('Failed to load brews.', e);
-      setBrews([]);
+      setAllBrews([]);
       setFilteredBrews([]);
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
-  }, [selectedBean]);
-
-  // Apply filtering and sorting
-  const applyFilters = useCallback((brewsToFilter: Brew[], bean: string | null) => {
-    // Apply bean filter
-    let result = brewsToFilter;
-    
-    if (bean && bean !== 'all') {
-      result = result.filter(brew => brew.beanName === bean);
-    }
-    
-    // Sort by date (newest first)
-    result.sort((a, b) => b.timestamp - a.timestamp);
-    
-    setFilteredBrews(result);
-  }, []);
-
-  // Handle filter changes
-  const handleBeanFilterChange = (item: BeanOption) => {
-    const beanValue = item.value === 'all' ? null : item.value;
-    setSelectedBean(beanValue);
-    applyFilters(brews, beanValue);
-  };
+  }, [beanNameFilter, applyFilter]);
 
   // Get suggestions for a brew
   const fetchSuggestion = async (brew: Brew) => {
@@ -112,7 +95,7 @@ export default function BrewsScreen() {
     
     try {
       // Get related brews with same bean
-      const relatedBrews = brews.filter(b => b.beanName === brew.beanName && b.id !== brew.id);
+      const relatedBrews = allBrews.filter(b => b.beanName === brew.beanName && b.id !== brew.id);
       
       // Get suggestion from OpenAI
       const suggestion = await getBrewSuggestions(brew, relatedBrews, brew.beanName);
@@ -125,7 +108,6 @@ export default function BrewsScreen() {
     }
   };
 
-  // useFocusEffect to load brews when the screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadBrews();
@@ -228,231 +210,98 @@ export default function BrewsScreen() {
     </TouchableOpacity>
   );
 
-  // Only group when no filters are applied
-  const shouldGroup = !selectedBean;
-
-  // Group brews by bean name when no filters are applied
-  const groupedBrews = shouldGroup ? filteredBrews.reduce((acc, brew) => {
-    const beanName = brew.beanName || 'Unnamed Bean';
-    if (!acc[beanName]) {
-      acc[beanName] = [];
-    }
-    acc[beanName].push(brew);
-    return acc;
-  }, {} as Record<string, Brew[]>) : null;
-
-  const renderGroupHeader = (beanName: string) => (
-    <View style={{ 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      marginTop: 16,
-      marginBottom: 8, 
-      paddingHorizontal: 4 
-    }}>
-      <Text style={{ 
-        fontSize: 18, 
-        fontWeight: '600', 
-        color: '#333', 
-        flex: 1 
-      }}>
-        {beanName || 'Unnamed Bean'}
-      </Text>
-      {groupedBrews && (
-        <View style={{
-          backgroundColor: '#2089dc',
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          borderRadius: 12,
-        }}>
-          <Text style={{
-            fontSize: 12,
-            color: 'white',
-            fontWeight: '600'
-          }}>
-            {groupedBrews[beanName]?.length || 0}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderGroupedItem = ({ item }: { item: { beanName: string; brews: Brew[] } }) => (
-    <View style={{ marginBottom: 8 }}>
-      {renderGroupHeader(item.beanName)}
-      {item.brews.map(brew => (
-        <View key={brew.id}>{renderBrewItem({ item: brew })}</View>
-      ))}
-    </View>
-  );
-
-  const sections = shouldGroup && groupedBrews ? 
-    Object.entries(groupedBrews).map(([beanName, brews]) => ({ beanName, brews })) : 
-    null;
-
   return (
-    <SafeAreaView style={{ 
-      flex: 1, 
-      backgroundColor: 'transparent' 
-    }} edges={['top', 'left', 'right']}>
-      <View style={{ 
-        flex: 1, 
-        backgroundColor: '#f5f5f5' 
-      }}>
-        <Card containerStyle={{
-          marginHorizontal: 12,
-          marginTop: 12,
-          marginBottom: 8,
-          borderRadius: 10,
-          elevation: 1,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.05,
-          shadowRadius: 2,
-          padding: 16
-        }}>
-          <Dropdown
-            style={{
-              height: 45,
-              borderColor: '#e1e1e1',
-              borderWidth: 1,
-              borderRadius: 8,
-              paddingHorizontal: 12
-            }}
-            placeholderStyle={{ color: '#9ca3af' }}
-            selectedTextStyle={{ color: '#333' }}
-            containerStyle={{ borderRadius: 8 }}
-            data={beanOptions}
-            labelField="label"
-            valueField="value"
-            placeholder="Filter by bean"
-            value={selectedBean || 'all'}
-            onChange={handleBeanFilterChange}
-          />
-        </Card>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' /* White */ }} className="dark:bg-black" edges={['top', 'left', 'right']}>
+      {/* Keep generic title in _layout.tsx, this useEffect will override it */}
+      {/* <Stack.Screen options={{ title: beanNameFilter || 'Brews' }} /> */}
+      <View style={{ flex: 1 }} className="bg-white dark:bg-black">
+        {/* Removed Filter Dropdown Card */}
 
-        <View style={{ flex: 1 }}>
-          {shouldGroup && sections ? (
-            <FlatList
-              data={sections}
-              renderItem={renderGroupedItem}
-              keyExtractor={(group) => group.beanName}
-              ListEmptyComponent={
-                <View style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: 64
-                }}>
-                  <Text style={{
-                    fontSize: 16,
-                    color: '#888',
-                    textAlign: 'center'
-                  }}>
-                    No brews saved yet
-                  </Text>
-                </View>
-              }
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={loadBrews} />
-              }
-              contentContainerStyle={{ 
-                paddingHorizontal: 12, 
-                paddingBottom: 40 
-              }}
-            />
-          ) : (
-            <FlatList
-              data={filteredBrews}
-              renderItem={renderBrewItem}
-              keyExtractor={(item) => item.id}
-              ListEmptyComponent={
-                <View style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: 64
-                }}>
-                  <Text style={{
-                    fontSize: 16,
-                    color: '#888',
-                    textAlign: 'center'
-                  }}>
-                    No brews match your filter
-                  </Text>
-                </View>
-              }
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={loadBrews} />
-              }
-              contentContainerStyle={{ 
-                paddingHorizontal: 12, 
-                paddingBottom: 40 
-              }}
-            />
-          )}
-        </View>
-
-        {/* Suggestion Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={suggestionModalVisible}
-          onRequestClose={() => setSuggestionModalVisible(false)}
-        >
-          <View style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'rgba(0,0,0,0.5)'
-          }}>
-            <View style={{
-              width: '90%',
-              backgroundColor: 'white',
-              borderRadius: 16,
-              padding: 20,
-              maxHeight: '80%',
-              elevation: 5,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-            }}>
-              <Text style={{ fontSize: 20, fontWeight: '600', marginBottom: 8 }}>
-                {selectedBrew?.beanName || 'Brew Details'}
+        {/* Use FlatList directly with filteredBrews */}
+        <FlatList
+          data={filteredBrews}
+          renderItem={renderBrewItem}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 64 }}>
+              <Text style={{ fontSize: 16, color: '#888', textAlign: 'center' }}>
+                {refreshing ? 'Loading...' : `No brews found for ${beanNameFilter || 'this bean'}`}
               </Text>
-              
-              <Text style={{ fontSize: 14, color: '#666', marginBottom: 4 }}>
-                {formatDate(selectedBrew?.timestamp || Date.now())}
-              </Text>
-              
-              <Divider style={{ marginVertical: 12 }} />
-              
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>AI Brew Suggestions</Text>
-                
-                {loadingSuggestion ? (
-                  <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 20 }}>
-                    <ActivityIndicator size="large" color="#2089dc" />
-                    <Text style={{ marginTop: 12, color: '#666' }}>Getting suggestions...</Text>
-                  </View>
-                ) : (
-                  <ScrollView style={{ maxHeight: 300 }}>
-                    <Text style={{ fontSize: 14, lineHeight: 20, color: '#333' }}>
-                      {suggestion || 'No suggestions available. Please set your OpenAI API key in settings.'}
-                    </Text>
-                  </ScrollView>
-                )}
-              </View>
-              
-              <Divider style={{ marginVertical: 12 }} />
-              
-              <Button
-                title="Close"
-                onPress={() => setSuggestionModalVisible(false)}
-                buttonStyle={{ borderRadius: 8 }}
-              />
             </View>
-          </View>
-        </Modal>
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={loadBrews} />
+          }
+          contentContainerStyle={{ 
+            paddingHorizontal: 12, 
+            paddingTop: 12,
+            paddingBottom: 40 
+          }}
+        />
       </View>
+
+      {/* Suggestion Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={suggestionModalVisible}
+        onRequestClose={() => setSuggestionModalVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        }}>
+          <View style={{
+            width: '90%',
+            backgroundColor: 'white',
+            borderRadius: 16,
+            padding: 20,
+            maxHeight: '80%',
+            elevation: 5,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+          }}>
+            <Text style={{ fontSize: 20, fontWeight: '600', marginBottom: 8 }}>
+              {selectedBrew?.beanName || 'Brew Details'}
+            </Text>
+            
+            <Text style={{ fontSize: 14, color: '#666', marginBottom: 4 }}>
+              {formatDate(selectedBrew?.timestamp || Date.now())}
+            </Text>
+            
+            <Divider style={{ marginVertical: 12 }} />
+            
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>AI Brew Suggestions</Text>
+              
+              {loadingSuggestion ? (
+                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 20 }}>
+                  <ActivityIndicator size="large" color="#2089dc" />
+                  <Text style={{ marginTop: 12, color: '#666' }}>Getting suggestions...</Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 300 }}>
+                  <Text style={{ fontSize: 14, lineHeight: 20, color: '#333' }}>
+                    {suggestion || 'No suggestions available. Please set your OpenAI API key in settings.'}
+                  </Text>
+                </ScrollView>
+              )}
+            </View>
+            
+            <Divider style={{ marginVertical: 12 }} />
+            
+            <Button
+              title="Close"
+              onPress={() => setSuggestionModalVisible(false)}
+              buttonStyle={{ borderRadius: 8 }}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 } 

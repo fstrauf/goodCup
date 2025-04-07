@@ -1,20 +1,4 @@
-// import React from 'react';
-// import { Stack } from 'expo-router';
-
-// export default function RootLayout() {
-//   return (
-//     <Stack
-//       screenOptions={{
-//         headerShown: false,
-//         contentStyle: { backgroundColor: 'white' },
-//       }}
-//     >
-//       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-//       <Stack.Screen name="index" options={{ headerShown: false }} />
-//     </Stack>
-//   );
-// }
-
+import '../global.css'; // Import global CSS for NativeWind
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
