@@ -48,6 +48,21 @@ export default function TabLayout() {
           tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
         }}
       />
+      {/* Dynamic screens within tabs - hidden from the tab bar */}
+      <Tabs.Screen 
+        name="[beanId]/brew"
+        options={{
+          title: 'Add Brew',
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen 
+        name="[beanId]/brews"
+        options={{
+          title: 'Brew History',
+          href: null, // Hide from tab bar
+        }}
+      />
     </Tabs>
   );
 } 

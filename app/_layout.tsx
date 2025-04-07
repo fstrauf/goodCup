@@ -43,9 +43,7 @@ export default function RootLayout() {
           <Stack>
             {/* Define the tabs group. headerShown: false hides the Stack header FOR the tabs screen itself */}
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            {/* Dynamic routes remain directly under the Stack */}
-            <Stack.Screen name="[beanId]/brew" options={{ title: 'Add Brew' }} />
-            <Stack.Screen name="[beanId]/brews" options={{ title: 'Brew History' }} />
+            {/* Dynamic routes are now handled within (tabs) */}
             <Stack.Screen name="+not-found" />
           </Stack>
           <StatusBar style="auto" />

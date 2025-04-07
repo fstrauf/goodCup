@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { FlatList, View, RefreshControl, TouchableOpacity, Modal, ActivityIndicator, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect, useRouter, useLocalSearchParams, Stack, useNavigation } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Text, Divider, Button } from '@rneui/themed';
-import { getBrewSuggestions, Brew } from '../../lib/openai';
+import { getBrewSuggestions, Brew } from '../../../lib/openai';
 
 // Storage keys
 const BREWS_STORAGE_KEY = '@GoodCup:brews';
@@ -35,7 +35,7 @@ export default function BrewsScreen() {
   const [allBrews, setAllBrews] = useState<Brew[]>([]);
   const [filteredBrews, setFilteredBrews] = useState<Brew[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const router = useRouter();
+  // const router = useRouter();
   
   // Suggestion modal state
   const [suggestionModalVisible, setSuggestionModalVisible] = useState(false);
