@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { FlatList, View, RefreshControl, TouchableOpacity, Modal, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { FlatList, View, RefreshControl, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Text, Divider, Button } from '@rneui/themed';
+import { Card, Text, Divider } from '@rneui/themed';
 import { getBrewSuggestions, Brew } from '../../../lib/openai';
-
+import type { BrewSuggestionResponse } from '../../../lib/openai'; // Import the response type
+import BeanNameHeader from '../../../components/BeanNameHeader'; // Trying path relative to app/(tabs)
 // --- Tailwind ---
 import resolveConfig from 'tailwindcss/resolveConfig';
 import tailwindConfig from '../../../tailwind.config.js'; // Adjust path
@@ -45,12 +46,6 @@ export default function BrewsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // const router = useRouter();
   
-  // Suggestion modal state
-  const [suggestionModalVisible, setSuggestionModalVisible] = useState(false);
-  const [selectedBrew, setSelectedBrew] = useState<Brew | null>(null);
-  const [suggestion, setSuggestion] = useState<string>('');
-  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
-
   // Effect to update header title
   useEffect(() => {
     if (beanNameFilter) {
@@ -94,27 +89,6 @@ export default function BrewsScreen() {
     }
   }, [beanNameFilter, applyFilter]);
 
-  // Get suggestions for a brew
-  const fetchSuggestion = async (brew: Brew) => {
-    setSelectedBrew(brew);
-    setSuggestion('');
-    setSuggestionModalVisible(true);
-    setLoadingSuggestion(true);
-    
-    try {
-      // Get related brews with same bean
-      const relatedBrews = allBrews.filter(b => b.beanName === brew.beanName && b.id !== brew.id);
-      
-      // Get suggestion from OpenAI
-      const suggestion = await getBrewSuggestions(brew, relatedBrews, brew.beanName);
-      setSuggestion(suggestion);
-    } catch (error) {
-      console.error('Error getting suggestion:', error);
-      setSuggestion('Error getting suggestion. Please try again later.');
-    } finally {
-      setLoadingSuggestion(false);
-    }
-  };
 
   useFocusEffect(
     useCallback(() => {
@@ -123,8 +97,9 @@ export default function BrewsScreen() {
   );
 
   const handleBrewPress = (brew: Brew) => {
-    // Show brew details modal and get suggestions
-    fetchSuggestion(brew);
+    // Temporarily removed suggestion functionality
+    // No action when clicking on brew history items
+    console.log("Brew selected:", brew.id);
   };
 
   const renderBrewItem = ({ item }: { item: Brew }) => (
@@ -173,8 +148,7 @@ export default function BrewsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} className="dark:bg-black" edges={['top', 'left', 'right']}>
-      {/* Keep generic title in _layout.tsx, this useEffect will override it */}
-      {/* <Stack.Screen options={{ title: beanNameFilter || 'Brews' }} /> */}
+      <BeanNameHeader beanName={beanNameFilter} prefix="Brews for:" />
       <View style={styles.mainContainer} className="bg-soft-off-white dark:bg-black">
         {/* Removed Filter Dropdown Card */}
 
@@ -196,54 +170,6 @@ export default function BrewsScreen() {
           contentContainerStyle={styles.flatListContentContainer}
         />
       </View>
-
-      {/* Suggestion Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={suggestionModalVisible}
-        onRequestClose={() => setSuggestionModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {selectedBrew?.beanName || 'Brew Details'}
-            </Text>
-            
-            <Text style={styles.modalDate}>
-              {formatDate(selectedBrew?.timestamp || Date.now())}
-            </Text>
-            
-            <Divider style={styles.modalDivider} />
-            
-            <View style={styles.modalSuggestionContainer}>
-              <Text style={styles.modalSuggestionTitle}>AI Brew Suggestions</Text>
-              
-              {loadingSuggestion ? (
-                <View style={styles.modalLoadingContainer}>
-                  <ActivityIndicator size="large" color={themeColors['cool-gray-green']} />
-                  <Text style={styles.modalLoadingText}>Getting suggestions...</Text>
-                </View>
-              ) : (
-                <ScrollView style={styles.modalSuggestionScroll}>
-                  <Text style={styles.modalSuggestionText}>
-                    {suggestion || 'No suggestions available. Please set your OpenAI API key in settings.'}
-                  </Text>
-                </ScrollView>
-              )}
-            </View>
-            
-            <Divider style={styles.modalDivider} />
-            
-            <Button
-              title="Close"
-              onPress={() => setSuggestionModalVisible(false)}
-              buttonStyle={styles.modalCloseButton}
-              titleStyle={styles.modalCloseButtonTitle}
-            />
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

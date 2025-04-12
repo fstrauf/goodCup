@@ -2,7 +2,6 @@
   "expo": {
     "name": "goodcup-app",
     "slug": "goodcup-app",
-    "main": "expo-router/entry",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

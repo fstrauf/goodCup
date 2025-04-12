@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, Text, Platform, Alert, View, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ScrollView, Text, Platform, Alert, View, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dropdown } from 'react-native-element-dropdown';
-import { Input, Slider, Switch, Card, Divider, Button as RNEButton } from '@rneui/themed';
-import { useLocalSearchParams } from 'expo-router';
+import { Input, Slider, Switch, Card, Divider, Button as RNEButton, Icon } from '@rneui/themed';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useRouter } from 'expo-router';
+import BeanNameHeader from '../../../components/BeanNameHeader'; // Trying path relative to app/(tabs)
 
 // --- Tailwind ---
 import resolveConfig from 'tailwindcss/resolveConfig';
@@ -16,8 +18,8 @@ const themeColors = fullConfig.theme.colors as unknown as Record<string, string>
 // --- End Tailwind ---
 
 const BREWS_STORAGE_KEY = '@GoodCup:brews';
-const BREW_DEVICES_KEY = '@GoodCup:brewDevices';
-const GRINDERS_KEY = '@GoodCup:grinders';
+const BREW_DEVICES_STORAGE_KEY = '@GoodCup:brewDevices';
+const GRINDERS_STORAGE_KEY = '@GoodCup:grinders';
 const DEFAULT_BREW_DEVICE_KEY = '@GoodCup:defaultBrewDevice';
 const DEFAULT_GRINDER_KEY = '@GoodCup:defaultGrinder';
 
@@ -70,7 +72,15 @@ const formatTime = (totalSeconds: number): string => {
 };
 
 const HomeScreenComponent = () => {
-  const params = useLocalSearchParams<{ beanName?: string }>();
+  const params = useLocalSearchParams<{ 
+    beanName?: string;
+    suggestion?: string;
+    grindSize?: string;
+    waterTemp?: string;
+    steepTime?: string;
+    useBloom?: string;
+    bloomTime?: string;
+  }>();
   const [beanName, setBeanName] = useState<string | null>(null);
   const [steepTimeSeconds, setSteepTimeSeconds] = useState(180);
   const [useBloom, setUseBloom] = useState(false);
@@ -89,18 +99,58 @@ const HomeScreenComponent = () => {
   const [gettingSuggestion, setGettingSuggestion] = useState(false);
   const [suggestion, setSuggestion] = useState<string>('');
   const [showSuggestion, setShowSuggestion] = useState(false);
+  
+  // New state for suggestion modal
+  const [suggestionModalVisible, setSuggestionModalVisible] = useState(false);
+  
+  // Reference to track if this is the first render
+  const isFirstRender = useRef(true);
+
+  const router = useRouter();
+  const navigation = useNavigation();
 
   useEffect(() => {
+    console.log("[brew.tsx Effect] Received route params:", JSON.stringify(params));
     if (params.beanName) {
       setBeanName(params.beanName);
       console.log("[Effect] Bean name set from route params:", params.beanName);
     } else {
       console.warn("[Effect] No beanName found in route params.");
-      // Optionally navigate back or show an error if beanName is essential
-      // Alert.alert('Error', 'No bean selected.');
-      // router.back();
     }
-  }, [params.beanName]);
+    
+    // Set parameters from suggestion if provided
+    if (params.suggestion) {
+      setSuggestion(params.suggestion);
+      
+      // Set form values if provided
+      if (params.grindSize) setGrindSize(params.grindSize);
+      if (params.waterTemp) setWaterTemp(params.waterTemp);
+      
+      if (params.steepTime) {
+        const time = parseInt(params.steepTime);
+        if (!isNaN(time)) {
+          setSteepTimeSeconds(time);
+        }
+      }
+      
+      if (params.useBloom === 'true') {
+        setUseBloom(true);
+        if (params.bloomTime) setBloomTime(params.bloomTime);
+      }
+      
+      // Show suggestion modal after a short delay to ensure the screen is fully loaded
+      setTimeout(() => setSuggestionModalVisible(true), 300);
+    }
+  }, [params]);
+
+  // Effect to update header title
+  useEffect(() => {
+    if (beanName) {
+      navigation.setOptions({ title: beanName });
+    } else {
+      navigation.setOptions({ title: 'New Brew' });
+    }
+  }, [beanName, navigation]);
 
   useEffect(() => {
     loadEquipment();
@@ -108,8 +158,8 @@ const HomeScreenComponent = () => {
 
   const loadEquipment = async () => {
     try {
-      const storedDevices = await AsyncStorage.getItem(BREW_DEVICES_KEY);
-      const storedGrinders = await AsyncStorage.getItem(GRINDERS_KEY);
+      const storedDevices = await AsyncStorage.getItem(BREW_DEVICES_STORAGE_KEY);
+      const storedGrinders = await AsyncStorage.getItem(GRINDERS_STORAGE_KEY);
       const defaultDeviceId = await AsyncStorage.getItem(DEFAULT_BREW_DEVICE_KEY);
       const defaultGrinderId = await AsyncStorage.getItem(DEFAULT_GRINDER_KEY);
       
@@ -119,11 +169,13 @@ const HomeScreenComponent = () => {
       if (storedDevices) {
         devices = JSON.parse(storedDevices);
         setBrewDevices(devices);
+        console.log("[LoadEquipment] Loaded brew devices:", devices.length);
       }
       
       if (storedGrinders) {
         grinders = JSON.parse(storedGrinders);
         setGrinders(grinders);
+        console.log("[LoadEquipment] Loaded grinders:", grinders.length);
       }
 
       // Set default selections if available AND if the default device/grinder still exists
@@ -185,7 +237,15 @@ const HomeScreenComponent = () => {
       setWaterTemp('');
       setRating(5);
       setNotes('');
-      Alert.alert('Success', `Brew saved for ${beanName}!`);
+      Alert.alert('Success', `Brew saved for ${beanName}!`, [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Navigate back to the beans list
+            router.replace('/');
+          }
+        }
+      ]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.error('[handleSaveBrew] Failed to save brew.', e);
@@ -268,259 +328,327 @@ const HomeScreenComponent = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-soft-off-white" edges={['top', 'left', 'right']}>
-      <View className="flex-1 bg-soft-off-white px-3">
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingBottom: 40 }}
-          keyboardShouldPersistTaps="handled"
+      <ScrollView
+        className="flex-1 px-3"
+        contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Card 
+          containerStyle={{
+            backgroundColor: themeColors['soft-off-white'],
+            borderRadius: 12,
+            borderWidth: 1, 
+            borderColor: themeColors['pale-gray'],
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+            marginBottom: 24,
+            marginHorizontal: 0,
+            shadowColor: themeColors['cool-gray-green'],
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2,
+          }}
+          wrapperStyle={{ padding: 0 }}
         >
- 
+          {/* Use the reusable component */}
+          <BeanNameHeader beanName={beanName} prefix="Brewing:" />
 
-          <Card 
-            containerStyle={{
-              backgroundColor: themeColors['soft-off-white'],
-              borderRadius: 12,
-              borderWidth: 1, 
-              borderColor: themeColors['pale-gray'],
-              paddingHorizontal: 0,
-              paddingVertical: 0,
-              marginBottom: 24,
-              marginHorizontal: 0,
-              shadowColor: themeColors['cool-gray-green'],
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 2,
-            }}
-            wrapperStyle={{ padding: 0 }}
-          >            
+          <View className="px-4 pb-2">
+            <Text className="text-lg font-semibold text-charcoal mb-3">Brew Parameters</Text>
             
-            <View className="px-4 pb-2">
-              <Text className="text-lg font-semibold text-charcoal mb-3">Brew Parameters</Text>
-              
-              <View className="mb-4">
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-base font-medium text-charcoal">Steep Time</Text>
-                  <Text className="text-base font-semibold text-cool-gray-green">
-                    {formatTime(timerActive ? timerSeconds : steepTimeSeconds)}
-                  </Text>
-                </View>
-                <Slider
-                  value={steepTimeSeconds}
-                  onValueChange={(value) => onSliderChange(value, 'time')}
-                  minimumValue={30}
-                  maximumValue={300}
-                  step={5}
-                  allowTouchTrack={true}
-                  minimumTrackTintColor={themeColors['cool-gray-green']}
-                  maximumTrackTintColor={themeColors['pale-gray']}
-                  thumbTintColor={themeColors['cool-gray-green']}
-                  trackStyle={{ height: 6, borderRadius: 3 }}
-                  thumbStyle={{ height: 20, width: 20, backgroundColor: themeColors['soft-off-white'], borderWidth: 2, borderColor: themeColors['cool-gray-green'] }}
-                />
+            <View className="mb-4">
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-base font-medium text-charcoal">Steep Time</Text>
+                <Text className="text-base font-semibold text-cool-gray-green">
+                  {formatTime(timerActive ? timerSeconds : steepTimeSeconds)}
+                </Text>
               </View>
+              <Slider
+                value={steepTimeSeconds}
+                onValueChange={(value) => onSliderChange(value, 'time')}
+                minimumValue={30}
+                maximumValue={300}
+                step={5}
+                allowTouchTrack={true}
+                minimumTrackTintColor={themeColors['cool-gray-green']}
+                maximumTrackTintColor={themeColors['pale-gray']}
+                thumbTintColor={themeColors['cool-gray-green']}
+                trackStyle={{ height: 6, borderRadius: 3 }}
+                thumbStyle={{ height: 20, width: 20, backgroundColor: themeColors['soft-off-white'], borderWidth: 2, borderColor: themeColors['cool-gray-green'] }}
+              />
+            </View>
 
-              <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-base font-medium text-charcoal">Use Bloom?</Text>
-                <Switch
-                  value={useBloom}
-                  onValueChange={setUseBloom}
-                  color={themeColors['cool-gray-green']}
-                />
-              </View>
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-base font-medium text-charcoal">Use Bloom?</Text>
+              <Switch
+                value={useBloom}
+                onValueChange={setUseBloom}
+                color={themeColors['cool-gray-green']}
+              />
+            </View>
 
-              {useBloom && (
-                <View className="mb-4">
-                  <Text className="text-base font-medium text-charcoal mb-2">Bloom Time (e.g., 0:30)</Text>
-                  <Input
-                    value={bloomTime}
-                    onChangeText={setBloomTime}
-                    placeholder="Minutes:Seconds"
-                    placeholderTextColor={themeColors['cool-gray-green']}
-                    keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
-                    inputContainerStyle={{
-                      borderWidth: 1,
-                      borderColor: themeColors['pebble-gray'],
-                      borderRadius: 8,
-                      paddingHorizontal: 10,
-                      backgroundColor: themeColors['soft-off-white'],
-                    }}
-                    inputStyle={{ color: themeColors['charcoal'] }}
-                  />
-                </View>
-              )}
-
+            {useBloom && (
               <View className="mb-4">
-                <Text className="text-base font-medium text-charcoal mb-2">Grind Size</Text>
+                <Text className="text-base font-medium text-charcoal mb-2">Bloom Time (e.g., 0:30)</Text>
                 <Input
-                  value={grindSize}
-                  onChangeText={setGrindSize}
-                  placeholder="Medium-Fine, 18 clicks, etc."
+                  value={bloomTime}
+                  onChangeText={setBloomTime}
+                  placeholder="Minutes:Seconds"
                   placeholderTextColor={themeColors['cool-gray-green']}
+                  keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
                   inputContainerStyle={{
-                     borderWidth: 1, 
-                     borderColor: themeColors['pebble-gray'],
-                     borderRadius: 8, 
-                     paddingHorizontal: 10,
-                     backgroundColor: themeColors['soft-off-white']
+                    borderWidth: 1,
+                    borderColor: themeColors['pebble-gray'],
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    backgroundColor: themeColors['soft-off-white'],
                   }}
                   inputStyle={{ color: themeColors['charcoal'] }}
                 />
               </View>
+            )}
 
-              <View className="mb-4">
-                <Text className="text-base font-medium text-charcoal mb-2">Water Temperature</Text>
-                <Input
-                  value={waterTemp}
-                  onChangeText={setWaterTemp}
-                  placeholder="96°C or 205°F"
-                  placeholderTextColor={themeColors['cool-gray-green']}
-                  keyboardType="numeric"
-                  inputContainerStyle={{
-                    borderWidth: 1, 
-                    borderColor: themeColors['pebble-gray'],
-                    borderRadius: 8, 
-                    paddingHorizontal: 10,
-                    backgroundColor: themeColors['soft-off-white']
-                  }}
-                   inputStyle={{ color: themeColors['charcoal'] }}
-                />
-              </View>
-            </View>
-
-            <Divider style={{ marginVertical: 16, backgroundColor: themeColors['pale-gray'], height: 1 }} />
-            
-            <View className="px-4 pb-2">
-              <Text className="text-lg font-semibold text-charcoal mb-3">Rating & Notes</Text>
-              <View className="mb-4">
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-base font-medium text-charcoal">Rating</Text>
-                  <Text className="text-base font-semibold text-cool-gray-green">{rating}/10</Text>
-                </View>
-                <Slider
-                  value={rating}
-                  onValueChange={(value) => onSliderChange(value, 'rating')}
-                  minimumValue={1}
-                  maximumValue={10}
-                  step={1}
-                  allowTouchTrack={true}
-                  minimumTrackTintColor={themeColors['cool-gray-green']}
-                  maximumTrackTintColor={themeColors['pale-gray']}
-                  thumbTintColor={themeColors['cool-gray-green']}
-                  trackStyle={{ height: 6, borderRadius: 3 }}
-                  thumbStyle={{ height: 20, width: 20, backgroundColor: themeColors['soft-off-white'], borderWidth: 2, borderColor: themeColors['cool-gray-green'] }}
-                />
-              </View>
-
-              <View className="mb-4">
-                <Text className="text-base font-medium text-charcoal mb-2">Notes</Text>
-                <Input
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Tasting notes, observations, etc."
-                  placeholderTextColor={themeColors['cool-gray-green']}
-                  multiline
-                  numberOfLines={4}
-                  inputContainerStyle={{
-                    borderWidth: 1,
-                    borderColor: themeColors['pebble-gray'],
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    minHeight: 100,
-                    backgroundColor: themeColors['soft-off-white']
-                  }}
-                  inputStyle={{
-                    color: themeColors['charcoal'],
-                    textAlignVertical: 'top',
-                    paddingTop: Platform.OS === 'ios' ? 0 : 0,
-                    minHeight: 80,
-                  }}
-                />
-              </View>
-            </View>
-            
-            <View className="px-4 pb-2">
-              <Text className="text-lg font-semibold text-charcoal mb-3">Equipment</Text>
-              <View className="mb-4">
-                <Text className="text-base font-medium text-charcoal mb-2">Brew Device</Text>
-                <Dropdown
-                  style={{
-                    height: 50,
-                    borderColor: themeColors['pebble-gray'],
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    backgroundColor: themeColors['soft-off-white']
-                  }}
-                  placeholderStyle={{ color: themeColors['cool-gray-green'] }}
-                  selectedTextStyle={{ color: themeColors['charcoal'] }}
-                  containerStyle={{ borderRadius: 8, borderColor: themeColors['pebble-gray'] }}
-                  itemTextStyle={{ color: themeColors['charcoal'] }}
-                  activeColor={themeColors['light-beige']}
-                  data={brewDeviceOptions}
-                  maxHeight={300}
-                  labelField="label"
-                  valueField="value"
-                  placeholder={brewDeviceOptions.length === 0 ? "Add in Settings" : "Select brew device"}
-                  value={selectedBrewDevice}
-                  onChange={(item: DropdownItem) => setSelectedBrewDevice(item.value)}
-                  disable={brewDeviceOptions.length === 0}
-                />
-                {brewDeviceOptions.length === 0 && (
-                  <Text className="text-xs text-cool-gray-green ml-2 mt-1">Add brew devices in Settings</Text>
-                )}
-              </View>
-
-              <View className="mb-4">
-                <Text className="text-base font-medium text-charcoal mb-2">Grinder</Text>
-                <Dropdown
-                   style={{
-                    height: 50,
-                    borderColor: themeColors['pebble-gray'],
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    backgroundColor: themeColors['soft-off-white']
-                  }}
-                  placeholderStyle={{ color: themeColors['cool-gray-green'] }}
-                  selectedTextStyle={{ color: themeColors['charcoal'] }}
-                  containerStyle={{ borderRadius: 8, borderColor: themeColors['pebble-gray'] }}
-                  itemTextStyle={{ color: themeColors['charcoal'] }}
-                  activeColor={themeColors['light-beige']}
-                  data={grinderOptions}
-                  maxHeight={300}
-                  labelField="label"
-                  valueField="value"
-                  placeholder={grinderOptions.length === 0 ? "Add in Settings" : "Select grinder"}
-                  value={selectedGrinder}
-                  onChange={(item: DropdownItem) => setSelectedGrinder(item.value)}
-                  disable={grinderOptions.length === 0}
-                />
-                {grinderOptions.length === 0 && (
-                  <Text className="text-xs text-cool-gray-green ml-2 mt-1">Add grinders in Settings</Text>
-                )}
-              </View>
-            </View>
-
-            <Divider style={{ marginVertical: 16, backgroundColor: themeColors['pale-gray'], height: 1 }} />       
-
-            <View className="px-4 pt-4 pb-4">
-              <RNEButton
-                title="Save Brew"
-                onPress={handleSaveBrew}
-                buttonStyle={{ backgroundColor: themeColors['muted-sage-green'], borderRadius: 8, height: 50 }}
-                titleStyle={{ color: themeColors['charcoal'], fontWeight: 'bold' }}
-                raised
-                disabled={!beanName}
-                disabledStyle={{ backgroundColor: themeColors['pale-gray'] }}
-                disabledTitleStyle={{ color: themeColors['cool-gray-green'] }}
+            <View className="mb-4">
+              <Text className="text-base font-medium text-charcoal mb-2">Grind Size</Text>
+              <Input
+                value={grindSize}
+                onChangeText={setGrindSize}
+                placeholder="Medium-Fine, 18 clicks, etc."
+                placeholderTextColor={themeColors['cool-gray-green']}
+                inputContainerStyle={{
+                   borderWidth: 1, 
+                   borderColor: themeColors['pebble-gray'],
+                   borderRadius: 8, 
+                   paddingHorizontal: 10,
+                   backgroundColor: themeColors['soft-off-white']
+                }}
+                inputStyle={{ color: themeColors['charcoal'] }}
               />
             </View>
 
-          </Card>
-        </ScrollView>
-      </View>
+            <View className="mb-4">
+              <Text className="text-base font-medium text-charcoal mb-2">Water Temperature</Text>
+              <Input
+                value={waterTemp}
+                onChangeText={setWaterTemp}
+                placeholder="96°C or 205°F"
+                placeholderTextColor={themeColors['cool-gray-green']}
+                keyboardType="numeric"
+                inputContainerStyle={{
+                  borderWidth: 1, 
+                  borderColor: themeColors['pebble-gray'],
+                  borderRadius: 8, 
+                  paddingHorizontal: 10,
+                  backgroundColor: themeColors['soft-off-white']
+                }}
+                 inputStyle={{ color: themeColors['charcoal'] }}
+              />
+            </View>
+          </View>
+
+          <Divider style={{ marginVertical: 16, backgroundColor: themeColors['pale-gray'], height: 1 }} />
+          
+          <View className="px-4 pb-2">
+            <Text className="text-lg font-semibold text-charcoal mb-3">Rating & Notes</Text>
+            <View className="mb-4">
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-base font-medium text-charcoal">Rating</Text>
+                <Text className="text-base font-semibold text-cool-gray-green">{rating}/10</Text>
+              </View>
+              <Slider
+                value={rating}
+                onValueChange={(value) => onSliderChange(value, 'rating')}
+                minimumValue={1}
+                maximumValue={10}
+                step={1}
+                allowTouchTrack={true}
+                minimumTrackTintColor={themeColors['cool-gray-green']}
+                maximumTrackTintColor={themeColors['pale-gray']}
+                thumbTintColor={themeColors['cool-gray-green']}
+                trackStyle={{ height: 6, borderRadius: 3 }}
+                thumbStyle={{ height: 20, width: 20, backgroundColor: themeColors['soft-off-white'], borderWidth: 2, borderColor: themeColors['cool-gray-green'] }}
+              />
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-base font-medium text-charcoal mb-2">Notes</Text>
+              <Input
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Tasting notes, observations, etc."
+                placeholderTextColor={themeColors['cool-gray-green']}
+                multiline
+                numberOfLines={4}
+                inputContainerStyle={{
+                  borderWidth: 1,
+                  borderColor: themeColors['pebble-gray'],
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  minHeight: 100,
+                  backgroundColor: themeColors['soft-off-white']
+                }}
+                inputStyle={{
+                  color: themeColors['charcoal'],
+                  textAlignVertical: 'top',
+                  paddingTop: Platform.OS === 'ios' ? 0 : 0,
+                  minHeight: 80,
+                }}
+              />
+            </View>
+          </View>
+          
+          <View className="px-4 pb-2">
+            <Text className="text-lg font-semibold text-charcoal mb-3">Equipment</Text>
+            <View className="mb-4">
+              <Text className="text-base font-medium text-charcoal mb-2">Brew Device</Text>
+              <Dropdown
+                style={{
+                  height: 50,
+                  borderColor: themeColors['pebble-gray'],
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  backgroundColor: themeColors['soft-off-white']
+                }}
+                placeholderStyle={{ color: themeColors['cool-gray-green'] }}
+                selectedTextStyle={{ color: themeColors['charcoal'] }}
+                containerStyle={{ borderRadius: 8, borderColor: themeColors['pebble-gray'] }}
+                itemTextStyle={{ color: themeColors['charcoal'] }}
+                activeColor={themeColors['light-beige']}
+                data={brewDeviceOptions}
+                maxHeight={300}
+                labelField="label"
+                valueField="value"
+                placeholder={brewDeviceOptions.length === 0 ? "Add in Settings" : "Select brew device"}
+                value={selectedBrewDevice}
+                onChange={(item: DropdownItem) => {
+                  console.log("Selected brew device:", item);
+                  setSelectedBrewDevice(item.value);
+                }}
+                disable={brewDeviceOptions.length === 0}
+                search={false}
+                renderItem={(item, selected) => (
+                  <View style={{ 
+                    padding: 12, 
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: selected ? themeColors['light-beige'] : 'transparent'
+                  }}>
+                    <Text style={{ color: themeColors['charcoal'] }}>{item.label}</Text>
+                  </View>
+                )}
+              />
+              {brewDeviceOptions.length === 0 && (
+                <Text className="text-xs text-cool-gray-green ml-2 mt-1">Add brew devices in Settings</Text>
+              )}
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-base font-medium text-charcoal mb-2">Grinder</Text>
+              <Dropdown
+                 style={{
+                  height: 50,
+                  borderColor: themeColors['pebble-gray'],
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  backgroundColor: themeColors['soft-off-white']
+                }}
+                placeholderStyle={{ color: themeColors['cool-gray-green'] }}
+                selectedTextStyle={{ color: themeColors['charcoal'] }}
+                containerStyle={{ borderRadius: 8, borderColor: themeColors['pebble-gray'] }}
+                itemTextStyle={{ color: themeColors['charcoal'] }}
+                activeColor={themeColors['light-beige']}
+                data={grinderOptions}
+                maxHeight={300}
+                labelField="label"
+                valueField="value"
+                placeholder={grinderOptions.length === 0 ? "Add in Settings" : "Select grinder"}
+                value={selectedGrinder}
+                onChange={(item: DropdownItem) => {
+                  console.log("Selected grinder:", item);
+                  setSelectedGrinder(item.value);
+                }}
+                disable={grinderOptions.length === 0}
+                search={false}
+                renderItem={(item, selected) => (
+                  <View style={{ 
+                    padding: 12, 
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: selected ? themeColors['light-beige'] : 'transparent'
+                  }}>
+                    <Text style={{ color: themeColors['charcoal'] }}>{item.label}</Text>
+                  </View>
+                )}
+              />
+              {grinderOptions.length === 0 && (
+                <Text className="text-xs text-cool-gray-green ml-2 mt-1">Add grinders in Settings</Text>
+              )}
+            </View>
+          </View>
+
+          <Divider style={{ marginVertical: 16, backgroundColor: themeColors['pale-gray'], height: 1 }} />       
+
+          <View className="px-4 pt-4 pb-4">
+            <RNEButton
+              title="Save Brew"
+              onPress={handleSaveBrew}
+              buttonStyle={{ backgroundColor: themeColors['muted-sage-green'], borderRadius: 8, height: 50 }}
+              titleStyle={{ color: themeColors['charcoal'], fontWeight: 'bold' }}
+              raised
+              disabled={!beanName}
+              disabledStyle={{ backgroundColor: themeColors['pale-gray'] }}
+              disabledTitleStyle={{ color: themeColors['cool-gray-green'] }}
+            />
+          </View>
+
+        </Card>
+      </ScrollView>
+      
+      {/* Suggestion Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={suggestionModalVisible}
+        onRequestClose={() => setSuggestionModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-charcoal/60 p-5">
+          <View className="w-full bg-soft-off-white rounded-2xl p-5 max-h-[80%] shadow-lg border border-pale-gray">
+            <View className="flex-row justify-between items-center">
+              <Text className="text-xl font-semibold text-charcoal flex-1 mr-2" numberOfLines={1}>
+                Brewing Suggestion for {beanName}
+              </Text>
+              <TouchableOpacity onPress={() => setSuggestionModalVisible(false)} className="p-1">
+                <Icon name="close" type="material" size={24} color="#A8B9AE" />
+              </TouchableOpacity>
+            </View>
+            
+            <Divider style={{ marginVertical: 12, backgroundColor: '#E7E7E7' }} />
+            
+            <ScrollView style={{ maxHeight: 400 }} className="mb-4">
+              <Text className="text-base leading-relaxed text-charcoal">
+                {suggestion || 'No suggestions available.'}
+              </Text>
+            </ScrollView>
+            
+            <Text className="text-sm text-cool-gray-green mb-3 italic">
+              Suggested brewing parameters have been pre-filled in the form below. Feel free to adjust them.
+            </Text>
+            
+            <RNEButton
+              title="Close and Brew"
+              onPress={() => setSuggestionModalVisible(false)}
+              buttonStyle={{ backgroundColor: themeColors['muted-sage-green'], borderRadius: 8, paddingVertical: 10 }}
+              titleStyle={{ color: themeColors['charcoal'], fontWeight: 'bold' }}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
